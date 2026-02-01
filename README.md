@@ -9,7 +9,6 @@ OAuth2 인가 및 토큰 발급 로직은 **RFC 문서를 기준으로 직접 �
 > 본 프로젝트에서는 **Spring Authorization Server를 사용하지 않는다.**  
 > (구조와 동작 방식은 참고만 한다)
 
-
 ## 📌 프로젝트 목표
 
 - OAuth2 표준(RFC 6749 및 관련 RFC)을 직접 구현
