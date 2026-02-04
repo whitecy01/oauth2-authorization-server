@@ -1,5 +1,6 @@
-package com.oauth.auth_server.config;
+package com.oauth.auth_server.test.config;
 
+import com.oauth.auth_server.springauthserver.web.OAuth2AuthorizationEndpointFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -8,7 +9,6 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 public class SecurityConfig {
-
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -26,6 +26,9 @@ public class SecurityConfig {
 
                 // 로그아웃도 기본 제공
                 .logout(Customizer.withDefaults());
+
+        http.addFilterAfter(new OAuth2AuthorizationEndpointFilter(),
+                org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -34,6 +34,11 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	/**
+	 * Spring Security OAuth2 Core 의존성 그대로 사용
+	 */
+	implementation "org.springframework.security:spring-security-oauth2-core"
 }
 
 tasks.named('test') {

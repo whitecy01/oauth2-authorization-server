@@ -1,4 +1,4 @@
-package com.oauth.auth_server.entity;
+package com.oauth.auth_server.test.entity;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
