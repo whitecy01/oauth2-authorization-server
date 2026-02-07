@@ -1,15 +1,21 @@
 package com.oauth.auth_server.springauthserver.web;
 
+import com.oauth.auth_server.springauthserver.web.authentication.OAuth2AuthorizationCodeRequestAuthenticationConverter;
+import org.springframework.security.web.authentication.DelegatingAuthenticationConverter;
+import com.oauth.auth_server.springauthserver.web.authentication.OAuth2AuthorizationConsentAuthenticationConverter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Arrays;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.web.authentication.AuthenticationConverter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+
 import org.springframework.util.Assert;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -22,12 +28,16 @@ public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
      */
     private final RequestMatcher authorizationEndpointMatcher;
 
+    private AuthenticationConverter authenticationConverter;
+
     /**
      * 인가 엔드 포인트 URL을 따로 안 주면 기본 값 /oauth2/authorize를 쓰겠다.
      */
     public OAuth2AuthorizationEndpointFilter() {
         this(DEFAULT_AUTHORIZATION_ENDPOINT_URI);
     }
+
+
 
     public OAuth2AuthorizationEndpointFilter(String authorizationEndpointUri) {
         Assert.hasText(authorizationEndpointUri, "authorizationEndpointUri cannot be empty");
@@ -36,6 +46,30 @@ public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
          * 동작해야하는지 결정하는 규칙
          */
         this.authorizationEndpointMatcher = createDefaultRequestMatcher(authorizationEndpointUri);
+
+        /**
+         * 이 요청이 인가 요청이냐?, 아니면 동의 제출 요청이냐?, 누가 처리할 수 있으면 그 사람이 Authentication 만들어라
+         *
+         * 최초 인가 요청, 동의 POST 요청 → 둘 다 같은 /oauth2/authorize로 오니까 → converter가 분기 역할을 해주는 거다.
+         * 즉, 분기를 자동으로 해주고, 파싱도 같이 해주는 역할
+         * OAuth2AuthorizationCodeRequestAuthenticationConverter -> 최초 인가 요청
+         * OAuth2AuthorizationConsentAuthenticationConverter -> 사용자가 동의 화면에서 '동의/거부' 버튼을 눌렀을 떄
+         * DelegatingAuthenticationConverter에 등록된 객체들을 돌면서 객체들 안에서 response_type 파라미터가 없으면(동의 제출) null 있으면(최초 요청) Authentication 생성
+         * DelegatingAuthenticationConverter이 “야, 너 이 요청 처리할 수 있어?” → 안 되면 다음 놈에게 또 물어봄 → 처리 가능하다고 응답한 첫 번째 놈을 채택
+         * 1. AuthorizationCodeRequestConverter.convert(request)
+         *    ├─ response_type=code ? → YES → Authentication 생성
+         *    └─ 아니면 → null
+         *
+         * 2. ConsentRequestConverter.convert(request)
+         *    ├─ 동의 제출 조건 만족? → YES → Authentication 생성
+         *    └─ 아니면 → null
+         *
+         * 3. 둘 다 아니면 → null 반환
+         */
+        this.authenticationConverter = new DelegatingAuthenticationConverter(
+                Arrays.asList(
+                        new OAuth2AuthorizationCodeRequestAuthenticationConverter(),
+                        new OAuth2AuthorizationConsentAuthenticationConverter()));
     }
 
     @Override
