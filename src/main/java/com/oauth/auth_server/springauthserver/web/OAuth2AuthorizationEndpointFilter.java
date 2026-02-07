@@ -37,8 +37,6 @@ public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
         this(DEFAULT_AUTHORIZATION_ENDPOINT_URI);
     }
 
-
-
     public OAuth2AuthorizationEndpointFilter(String authorizationEndpointUri) {
         Assert.hasText(authorizationEndpointUri, "authorizationEndpointUri cannot be empty");
         /**
