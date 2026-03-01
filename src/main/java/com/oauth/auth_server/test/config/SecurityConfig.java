@@ -1,8 +1,9 @@
 package com.oauth.auth_server.test.config;
 
-import com.oauth.auth_server.springauthserver.web.OAuth2AuthorizationEndpointFilter;
+import com.oauth.auth_server.web.OAuth2AuthorizationEndpointFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -11,6 +12,9 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        AuthenticationManager authenticationManager = authConfig.getAuthenticationManager();
+
         http
                 // 개발 초기에는 CSRF 끄는 게 테스트 편함(나중에 다시 켜도 됨)
                 .csrf(csrf -> csrf.disable())

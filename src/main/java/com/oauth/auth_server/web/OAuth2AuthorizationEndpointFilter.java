@@ -1,8 +1,14 @@
-package com.oauth.auth_server.springauthserver.web;
+package com.oauth.auth_server.web;
 
-import com.oauth.auth_server.springauthserver.web.authentication.OAuth2AuthorizationCodeRequestAuthenticationConverter;
+import com.oauth.auth_server.web.authentication.OAuth2AuthorizationCodeRequestAuthenticationConverter;
+import org.springframework.core.log.LogMessage;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.AuthenticationDetailsSource;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.DelegatingAuthenticationConverter;
-import com.oauth.auth_server.springauthserver.web.authentication.OAuth2AuthorizationConsentAuthenticationConverter;
+import com.oauth.auth_server.web.authentication.OAuth2AuthorizationConsentAuthenticationConverter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.web.authentication.AuthenticationConverter;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
@@ -31,19 +38,32 @@ public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
     private AuthenticationConverter authenticationConverter;
 
     /**
-     * 인가 엔드 포인트 URL을 따로 안 주면 기본 값 /oauth2/authorize를 쓰겠다.
+     * HTTP 요청으로부터 Authentication에 주입할 보안 메타데이터를 생성하는 컴포넌트
      */
-    public OAuth2AuthorizationEndpointFilter() {
-        this(DEFAULT_AUTHORIZATION_ENDPOINT_URI);
+    private AuthenticationDetailsSource<HttpServletRequest, ?> authenticationDetailsSource = new WebAuthenticationDetailsSource();
+
+    /**
+     * Authentication 객체를 받아서 이게 인증 성공인지, 실패인지 판정하고 결과 Authentication을 반환하는 컴포넌트
+     */
+    private final AuthenticationManager authenticationManager;
+
+    /**
+     * 인가 엔드 포인트 URL을 따로 안 주면 기본 값 /oauth2/authorize를 쓰겠다.
+     */    public OAuth2AuthorizationEndpointFilter(AuthenticationManager authenticationManager) {
+        this(authenticationManager, DEFAULT_AUTHORIZATION_ENDPOINT_URI);
     }
 
-    public OAuth2AuthorizationEndpointFilter(String authorizationEndpointUri) {
+
+
+    public OAuth2AuthorizationEndpointFilter(AuthenticationManager authenticationManager, String authorizationEndpointUri) {
         Assert.hasText(authorizationEndpointUri, "authorizationEndpointUri cannot be empty");
         /**
          * 어떤 HTTP 요청을 /oauth2/authorize 인가 요청으로 볼 것인가?를 정의하는 요청 판별기(RequestMatcher) 즉, 이 Filter 언제
          * 동작해야하는지 결정하는 규칙
          */
         this.authorizationEndpointMatcher = createDefaultRequestMatcher(authorizationEndpointUri);
+
+        this.authenticationManager = authenticationManager;
 
         /**
          * 이 요청이 인가 요청이냐?, 아니면 동의 제출 요청이냐?, 누가 처리할 수 있으면 그 사람이 Authentication 만들어라
@@ -80,6 +100,39 @@ public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+
+        /** HTTP 요청 → OAuth 요청 객체로 변환 즉, 파싱만 하는 거임
+         *  request.getParameter(“client_id”)
+         *  request.getParameter(“redirect_uri”)
+         *  request.getParameter(“response_type”)
+         *  convert는 자동으로 어떤 요청(최초 인가 요청, 동의 POST 요청)인지 판단해서 파싱함
+         *  Authentication은 ‘누가/무엇이/어떤 자격으로 요청했는지’를 표현하는 Spring Security의 표준 보안 의미 객체다.
+         */
+        Authentication authentication = this.authenticationConverter.convert(request);
+
+        /**
+         * authentication이 AbstractAuthenticationToken 타입이면 안전하게 캐스팅해서 authenticationToken 변수로 쓰겠다
+         * AbstractAuthenticationToken으로 바꾸는 이유는 Authentication에 ‘요청의 맥락 정보(details)’를 저장하기 위해서다.
+         * Authentication의 인터페이스에 요청 환경 담을 자리가 없음 그래서 AbstractAuthenticationToken는 실제 쓰라고 만든 기본 구현체임
+         * 그래서 이 Authentication이 Spring Security 표준 토큰 계열이라면 요청의 IP, 세션 같은 맥락 정보를 여기에 붙여두자
+         * 하는 이유 -> 이 요청이 어디서 왔는지(IP, 세션 등)를 Authentication 객체에 기록해 두려고” 하는 것
+         */
+        if (authentication instanceof AbstractAuthenticationToken authenticationToken) {
+            /**
+             * authenticationDetailsSource는 HttpServletRequest로부터 Authentication에 넣을 ‘요청 환경 정보(details)’를 만들어주는 팩토리다.
+             * authentication -> 보안 의미(누가 무엇을 요청), authenticationDetialsSource -> 요청 환경 정보 생성, details -> 환경 정보 저장소
+             * authenticationDetailsSource 인터페이스 안에 -> buildDetails
+             * Spring Security 기본 값은 WebAuthenticationDetailsSource -> 안에 요청한 IP, sessionId 이걸 Authentication에 붙여주는 거
+             */
+            authenticationToken.setDetails(this.authenticationDetailsSource.buildDetails(request));
+        }
+
+        Authentication authenticationResult = this.authenticationManager.authenticate(authentication);
+
+
+
+
+
 
         // 필터가 탔다 증거
         System.out.println("[AuthzFilter] matched: " + request.getMethod() + " " + request.getRequestURI()
