@@ -1,12 +1,10 @@
 package com.oauth.auth_server.web;
 
 import com.oauth.auth_server.web.authentication.OAuth2AuthorizationCodeRequestAuthenticationConverter;
-import org.springframework.core.log.LogMessage;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationDetailsSource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.DelegatingAuthenticationConverter;
 import com.oauth.auth_server.web.authentication.OAuth2AuthorizationConsentAuthenticationConverter;
 import jakarta.servlet.FilterChain;
