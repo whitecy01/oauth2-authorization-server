@@ -33,8 +33,11 @@ public class AuthorizationController {
      */
     @GetMapping("/oauth2/authorize")
     public void authorize(
+            @RequestParam("response_type") String responseType,
             @RequestParam("client_id") String clientId,
             @RequestParam("redirect_uri") String redirectUri,
+            @RequestParam(value = "scope", required = false) String scope,
+            @RequestParam(value = "state", required = false) String state,
             @AuthenticationPrincipal UserDetails user,
             HttpServletResponse response
     ) throws IOException {
@@ -56,6 +59,14 @@ public class AuthorizationController {
             response.sendError(400, "invalid_client");
             return;
         }
+
+        System.out.println("=== Authorization Request ===");
+        System.out.println("response_type = " + responseType);
+        System.out.println("client_id = " + clientId);
+        System.out.println("redirect_uri = " + redirectUri);
+        System.out.println("scope = " + scope);
+        System.out.println("state = " + state);
+
         /**
          * redirect_uri 검증 (등록된 redirect_uri와 정확히 일치해야 함)
          */
