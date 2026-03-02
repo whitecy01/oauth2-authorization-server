@@ -56,7 +56,6 @@ public class AuthorizationController {
             response.sendError(400, "invalid_client");
             return;
         }
-
         /**
          * redirect_uri 검증 (등록된 redirect_uri와 정확히 일치해야 함)
          */
@@ -64,7 +63,6 @@ public class AuthorizationController {
             response.sendError(400, "invalid_redirect_uri");
             return;
         }
-
         /**
          * authorization code 발급
          */
