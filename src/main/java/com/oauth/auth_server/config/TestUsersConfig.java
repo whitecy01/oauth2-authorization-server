@@ -1,4 +1,4 @@
-package com.oauth.auth_server.test.config;
+package com.oauth.auth_server.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
