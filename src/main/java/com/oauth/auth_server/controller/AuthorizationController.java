@@ -74,6 +74,7 @@ public class AuthorizationController {
             response.sendError(400, "invalid_redirect_uri");
             return;
         }
+
         /**
          * authorization code 발급
          */
