@@ -4,6 +4,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -16,7 +20,7 @@ public class SecurityConfig {
 
                 // 인가 서버 엔드포인트는 인증 필요
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/error").permitAll()
+                        .requestMatchers("/login", "/error", "/admin/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 기본 폼 로그인 페이지 사용
@@ -25,5 +29,15 @@ public class SecurityConfig {
                 .logout(Customizer.withDefaults());
 
         return http.build();
+    }
+
+    @Bean
+    UserDetailsService userDetailsService() {
+        UserDetails user = User.withUsername("user")
+                .password("{noop}1234") // 개발용. 나중에 BCrypt로 바꾸기
+                .roles("USER")
+                .build();
+
+        return new InMemoryUserDetailsManager(user);
     }
 }
