@@ -1,0 +1,363 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Clients</title>
+    <style>
+        :root {
+            --bg: #f4efe7;
+            --panel: #fffaf3;
+            --line: #d9cbb6;
+            --text: #1f1a17;
+            --muted: #6c6258;
+            --accent: #a44a3f;
+            --accent-strong: #7d3027;
+            --tag-bg: #efe2d1;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, #fff7ea 0, transparent 35%),
+                linear-gradient(180deg, #f6f1ea 0%, #efe5d7 100%);
+        }
+
+        .page {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 32px 20px 48px;
+        }
+
+        .intro {
+            margin-bottom: 24px;
+        }
+
+        .intro p {
+            margin: 8px 0 0;
+            color: var(--muted);
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .panel {
+            background: rgba(255, 250, 243, 0.94);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow: 0 18px 45px rgba(87, 59, 33, 0.08);
+        }
+
+        .panel h2 {
+            margin: 0 0 16px;
+            font-size: 1.2rem;
+        }
+
+        .summary {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .summary-card {
+            min-width: 140px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: #f9f1e7;
+            border: 1px solid #eadbc8;
+        }
+
+        .summary-card strong {
+            display: block;
+            font-size: 1.4rem;
+            margin-top: 4px;
+        }
+
+        .client-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .client-card {
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 18px;
+            background: #fffdf9;
+        }
+
+        .client-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+            margin-bottom: 14px;
+        }
+
+        .client-header h3 {
+            margin: 0 0 4px;
+            font-size: 1.05rem;
+        }
+
+        .client-id {
+            margin: 0;
+            color: var(--muted);
+            word-break: break-all;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
+
+        .status.active {
+            background: #dcefdc;
+            color: #22543d;
+        }
+
+        .status.inactive {
+            background: #f6d8d5;
+            color: #8a1c15;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .detail-block {
+            padding: 14px;
+            background: #f8f2ea;
+            border-radius: 12px;
+        }
+
+        .detail-block h4 {
+            margin: 0 0 10px;
+            font-size: 0.95rem;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            display: inline-flex;
+            max-width: 100%;
+            padding: 6px 10px;
+            background: var(--tag-bg);
+            border-radius: 999px;
+            font-size: 0.88rem;
+            word-break: break-all;
+        }
+
+        .empty-text {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        form {
+            display: grid;
+            gap: 14px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+            font-size: 0.92rem;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: #fff;
+            font-size: 0.95rem;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-row label {
+            margin: 0;
+        }
+
+        .hint {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.86rem;
+        }
+
+        button {
+            border: 0;
+            border-radius: 12px;
+            padding: 13px 16px;
+            background: var(--accent);
+            color: #fff7f4;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--accent-strong);
+        }
+
+        @media (max-width: 960px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .page {
+                padding: 20px 14px 32px;
+            }
+
+            .client-header,
+            .detail-grid {
+                grid-template-columns: 1fr;
+                display: grid;
+            }
+
+            .client-header {
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="intro">
+        <h1>OAuth Clients</h1>
+        <p>등록된 클라이언트를 한 화면에서 확인하고 바로 새 클라이언트를 추가할 수 있습니다.</p>
+    </div>
+
+    <div class="layout">
+        <section class="panel">
+            <h2>Registered Clients</h2>
+
+            <div class="summary">
+                <div class="summary-card">
+                    <span>Total Clients</span>
+                    <strong th:text="${#lists.size(clients)}">0</strong>
+                </div>
+                <div class="summary-card">
+                    <span>Active Clients</span>
+                    <strong th:text="${activeClientCount}">0</strong>
+                </div>
+            </div>
+
+            <div class="client-list">
+                <article class="client-card" th:if="${#lists.isEmpty(clients)}">
+                    <p class="empty-text">등록된 클라이언트가 없습니다. 오른쪽 폼에서 첫 클라이언트를 생성하세요.</p>
+                </article>
+
+                <article class="client-card" th:each="entry : ${clients}" th:with="client=${entry.client}">
+                    <div class="client-header">
+                        <div>
+                            <h3 th:text="${client.clientName}">Sample Client</h3>
+                            <p class="client-id" th:text="${client.clientId}">sample-client</p>
+                        </div>
+                        <span
+                                class="status"
+                                th:classappend="${client.active} ? ' active' : ' inactive'"
+                                th:text="${client.active} ? 'ACTIVE' : 'INACTIVE'">
+                            ACTIVE
+                        </span>
+                    </div>
+
+                    <div class="detail-grid">
+                        <section class="detail-block">
+                            <h4>Redirect URIs</h4>
+                            <p class="empty-text" th:if="${#lists.isEmpty(entry.redirectUris)}">설정된 Redirect URI가 없습니다.</p>
+                            <div class="tag-list" th:if="${!#lists.isEmpty(entry.redirectUris)}">
+                                <span class="tag" th:each="uri : ${entry.redirectUris}" th:text="${uri}">http://localhost:9000/callback</span>
+                            </div>
+                        </section>
+
+                        <section class="detail-block">
+                            <h4>Scopes</h4>
+                            <p class="empty-text" th:if="${#lists.isEmpty(entry.scopes)}">설정된 Scope가 없습니다.</p>
+                            <div class="tag-list" th:if="${!#lists.isEmpty(entry.scopes)}">
+                                <span class="tag" th:each="scope : ${entry.scopes}" th:text="${scope}">read</span>
+                            </div>
+                        </section>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Add New Client</h2>
+            <form th:action="@{/admin/clients}" th:object="${form}" method="post">
+                <div>
+                    <label for="clientId">clientId</label>
+                    <input id="clientId" type="text" th:field="*{clientId}" placeholder="web-app-client" />
+                </div>
+
+                <div>
+                    <label for="clientSecret">clientSecret</label>
+                    <input id="clientSecret" type="text" th:field="*{clientSecret}" placeholder="secret" />
+                </div>
+
+                <div>
+                    <label for="clientName">clientName</label>
+                    <input id="clientName" type="text" th:field="*{clientName}" placeholder="Web Application" />
+                </div>
+
+                <div>
+                    <label for="redirectUrisCsv">redirectUris</label>
+                    <input
+                            id="redirectUrisCsv"
+                            type="text"
+                            th:field="*{redirectUrisCsv}"
+                            placeholder="http://localhost:9000/callback, http://localhost:9000/callback2"
+                    />
+                    <p class="hint">쉼표로 구분해서 여러 개를 등록할 수 있습니다.</p>
+                </div>
+
+                <div>
+                    <label for="scopesCsv">scopes</label>
+                    <input
+                            id="scopesCsv"
+                            type="text"
+                            th:field="*{scopesCsv}"
+                            placeholder="read, write"
+                    />
+                    <p class="hint">예: read, write, profile</p>
+                </div>
+
+                <div class="checkbox-row">
+                    <input id="active" type="checkbox" th:field="*{active}" />
+                    <label for="active">active</label>
+                </div>
+
+                <button type="submit">Create Client</button>
+            </form>
+        </section>
+    </div>
+</div>
+</body>
+</html>

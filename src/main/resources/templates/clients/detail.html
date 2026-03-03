@@ -1,0 +1,26 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Client Detail</title></head>
+<body>
+
+<h1>Client Detail</h1>
+
+<div th:with="c=${detail.client}">
+    <p><b>clientId:</b> <span th:text="${c.clientId}"></span></p>
+    <p><b>name:</b> <span th:text="${c.clientName}"></span></p>
+    <p><b>active:</b> <span th:text="${c.active}"></span></p>
+</div>
+
+<h3>Redirect URIs</h3>
+<ul>
+    <li th:each="u : ${detail.redirectUris}" th:text="${u}"></li>
+</ul>
+
+<h3>Scopes</h3>
+<ul>
+    <li th:each="s : ${detail.scopes}" th:text="${s}"></li>
+</ul>
+
+<p><a th:href="@{/admin/clients}">Back</a></p>
+</body>
+</html>
