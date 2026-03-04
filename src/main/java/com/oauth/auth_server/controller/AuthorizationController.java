@@ -106,7 +106,7 @@ public class AuthorizationController {
             String state
     ) {
         String code = UUID.randomUUID().toString().replace("-", "");
-        Instant expiresAt = Instant.now().plusSeconds(300);
+        Instant expiresAt = Instant.now().plusSeconds(600);
 
         codeRepository.save(new OauthAuthorizationCode(
                 code,
