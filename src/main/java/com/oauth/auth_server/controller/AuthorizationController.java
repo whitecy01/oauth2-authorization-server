@@ -52,7 +52,7 @@ public class AuthorizationController {
         if (consentService.hasConsent(username, client.getClientId(), requestedScopes)) {
             return issueAuthorizationCode(client, username, redirectUri, state);
         }
-
+        System.out.println("AuthorizationController : " + client.getClientId());
         model.addAttribute("client", client);
         model.addAttribute("username", username);
         model.addAttribute("requestedScopes", requestedScopes);
