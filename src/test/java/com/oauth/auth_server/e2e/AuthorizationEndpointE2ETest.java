@@ -53,6 +53,10 @@ class AuthorizationEndpointE2ETest {
 //        System.out.println("[E2E] authorize_requiresAuthentication - done");
 //    }
 
+    /**
+     * 사용자 로그인부터해서 인가 코드 까지 진행
+     * @throws Exception
+     */
     @Test
     void loggedInUser_withConsent_getsAuthorizationCode() throws Exception{
         System.out.println("[E2E] loggedInUser_withConsent_getsAuthorizationCode - start");

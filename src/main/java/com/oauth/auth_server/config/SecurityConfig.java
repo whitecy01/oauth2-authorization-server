@@ -20,7 +20,7 @@ public class SecurityConfig {
 
                 // 인가 서버 엔드포인트는 인증 필요
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/error", "/admin/**", "/oauth2/token", "/oauth2/token-page").permitAll()
+                        .requestMatchers("/login", "/error", "/admin/**", "/oauth2/token", "/oauth2/token-page", "/resource/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 기본 폼 로그인 페이지 사용
