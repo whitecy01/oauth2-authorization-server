@@ -53,6 +53,15 @@ OAuth2 인가 및 토큰 발급 로직은 **RFC 문서를 기준으로 직접 �
 - **PostgreSQL**
 - Gradle
 
+## 🧭 문서 가이드
+
+프로젝트 진행 상태와 RFC 준수 여부는 아래 문서에서 관리한다.
+
+- [RFC 6749 체크리스트](/Users/jeongjaeyoon/Documents/GitHub/oauth2-authorization-server/docs/rfc-6749-checklist.md)
+- [버전별 구현 계획](/Users/jeongjaeyoon/Documents/GitHub/oauth2-authorization-server/docs/versions.md)
+
+현재 구현은 학습 목적의 임시 버전이며, 이후 `Spring Authorization Server`의 구조를 참고해 책임 분리와 내부 설계를 점진적으로 재구성한다.
+
 
 ## 🔐 인증 구조 개요
 
@@ -77,4 +86,3 @@ Spring Security는 **OAuth2 로직을 담당하지 않으며**, 인가 서버의
 5. 보호 API 및 Bearer Token 검증
 
 각 단계는 GitHub Project / Issue 단위로 관리된다.
-
