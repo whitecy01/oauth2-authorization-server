@@ -37,7 +37,7 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
-	mockitoAgent 'org.mockito:mockito-core'
+	mockitoAgent('org.mockito:mockito-core') { transitive = false }
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
 	/**
