@@ -3,15 +3,19 @@ package com.oauth.auth_server.controller;
 import com.oauth.auth_server.entity.OauthAuthorizationCode;
 import com.oauth.auth_server.clientregistration.entity.OauthClient;
 import com.oauth.auth_server.clientregistration.entity.OauthClientRedirectUri;
+import com.oauth.auth_server.clientregistration.entity.OauthClientScope;
 import com.oauth.auth_server.repository.OauthAuthorizationCodeRepository;
 import com.oauth.auth_server.clientregistration.repository.OauthClientRedirectUriRepository;
 import com.oauth.auth_server.clientregistration.repository.OauthClientRepository;
+import com.oauth.auth_server.clientregistration.repository.OauthClientScopeRepository;
 import com.oauth.auth_server.service.AuthorizationConsentService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,8 +31,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Controller
 @RequiredArgsConstructor
 public class AuthorizationController {
+    // RFC 6749 §3.3: scope-token = 1*( %x21 / %x23-5B / %x5D-7E )
+    private static final Pattern SCOPE_TOKEN_PATTERN = Pattern.compile("[\\x21\\x23-\\x5B\\x5D-\\x7E]+");
+
     private final OauthClientRepository clientRepository;
     private final OauthClientRedirectUriRepository clientRedirectUriRepository;
+    private final OauthClientScopeRepository clientScopeRepository;
     private final OauthAuthorizationCodeRepository codeRepository;
     private final AuthorizationConsentService consentService;
 
@@ -40,6 +48,7 @@ public class AuthorizationController {
             @RequestParam(value = "scope", required = false) String scope,
             @RequestParam(value = "state", required = false) String state,
             @AuthenticationPrincipal UserDetails user,
+            HttpServletRequest request,
             Model model
     ) {
         if (responseType == null || responseType.isBlank()) {
@@ -85,8 +94,38 @@ public class AuthorizationController {
             return ResponseEntity.badRequest().build();
         }
 
-        String username = user.getUsername();
+        // scope 중복 파라미터 검사 (scope=read&scope=write 형태 불허)
+        String[] scopeValues = request.getParameterValues("scope");
+        if (scopeValues != null && scopeValues.length > 1) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_scope", state)))
+                    .build();
+        }
+
         List<String> requestedScopes = splitScopes(scope);
+
+        // scope 형식 및 등록값 검증
+        if (!requestedScopes.isEmpty()) {
+            List<String> allowedScopes = clientScopeRepository.findByClient_ClientId(clientId)
+                    .stream()
+                    .map(OauthClientScope::getScope)
+                    .toList();
+
+            for (String token : requestedScopes) {
+                if (!SCOPE_TOKEN_PATTERN.matcher(token).matches()) {
+                    return ResponseEntity.status(HttpStatus.FOUND)
+                            .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_scope", state)))
+                            .build();
+                }
+                if (!allowedScopes.contains(token)) {
+                    return ResponseEntity.status(HttpStatus.FOUND)
+                            .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_scope", state)))
+                            .build();
+                }
+            }
+        }
+
+        String username = user.getUsername();
 
         if (consentService.hasConsent(username, client.getClientId(), requestedScopes)) {
             return issueAuthorizationCode(client, username, redirectUri, state);
