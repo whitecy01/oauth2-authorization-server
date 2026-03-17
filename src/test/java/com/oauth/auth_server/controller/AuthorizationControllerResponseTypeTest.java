@@ -43,6 +43,9 @@ class AuthorizationControllerResponseTypeTest {
     private static final String REDIRECT_URI = "http://localhost:8080/callback";
 
     /**
+     * <h2>인가 엔드 포인트 ResponseType</h2>
+     */
+    /**
      * response_type=code 는 유일하게 지원하는 정상 값이다.
      * 검증을 통과해 동의 화면(200 OK)이 반환되어야 한다.
      */

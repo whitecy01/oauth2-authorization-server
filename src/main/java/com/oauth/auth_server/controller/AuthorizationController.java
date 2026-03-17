@@ -62,6 +62,15 @@ public class AuthorizationController {
                     .build();
         }
 
+        /**
+         * client_id의 검증
+         */
+        if (clientId == null || clientId.isBlank()){
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_request", state)))
+                    .build();
+        }
+
         String username = user.getUsername();
         List<String> requestedScopes = splitScopes(scope);
         OauthClient client = clientRepository.findByClientIdAndActiveTrue(clientId)
