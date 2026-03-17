@@ -36,7 +36,7 @@ public class AuthorizationController {
      */
     @GetMapping("/oauth2/authorize")
     public Object authorize(
-            @RequestParam("response_type") String responseType,
+            @RequestParam(value = "response_type", required = false) String responseType,
             @RequestParam("client_id") String clientId,
             @RequestParam("redirect_uri") String redirectUri,
             @RequestParam(value = "scope", required = false) String scope,
@@ -44,6 +44,24 @@ public class AuthorizationController {
             @AuthenticationPrincipal UserDetails user,
             Model model
     ) {
+        /**
+         * responseType 이 없거나 빈 문자열 및 값이 없을 때
+         */
+        if (responseType == null || responseType.isBlank()) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_request", state)))
+                    .build();
+        }
+
+        /**
+         * responseType에서 지원하지 않는 인증일 때
+         */
+        if (!responseType.equals("code")){
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(buildErrorRedirectUri(redirectUri, "unsupported_response_type", state)))
+                    .build();
+        }
+
         String username = user.getUsername();
         List<String> requestedScopes = splitScopes(scope);
         OauthClient client = clientRepository.findByClientIdAndActiveTrue(clientId)
@@ -80,7 +98,7 @@ public class AuthorizationController {
 
         if ("deny".equals(action)) {
             return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(buildErrorRedirectUri(redirectUri, state)))
+                    .location(URI.create(buildErrorRedirectUri(redirectUri, "access_denied", state)))
                     .build();
         }
 
@@ -128,9 +146,9 @@ public class AuthorizationController {
                 .build();
     }
 
-    private String buildErrorRedirectUri(String redirectUri, String state) {
+    private String buildErrorRedirectUri(String redirectUri, String error, String state) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(redirectUri)
-                .queryParam("error", "access_denied");
+                .queryParam("error", error);
         if (state != null && !state.isBlank()) {
             builder.queryParam("state", state);
         }
