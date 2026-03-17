@@ -2,7 +2,9 @@ package com.oauth.auth_server.controller;
 
 import com.oauth.auth_server.entity.OauthAuthorizationCode;
 import com.oauth.auth_server.clientregistration.entity.OauthClient;
+import com.oauth.auth_server.clientregistration.entity.OauthClientRedirectUri;
 import com.oauth.auth_server.repository.OauthAuthorizationCodeRepository;
+import com.oauth.auth_server.clientregistration.repository.OauthClientRedirectUriRepository;
 import com.oauth.auth_server.clientregistration.repository.OauthClientRepository;
 import com.oauth.auth_server.service.AuthorizationConsentService;
 import java.net.URI;
@@ -26,55 +28,65 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class AuthorizationController {
     private final OauthClientRepository clientRepository;
+    private final OauthClientRedirectUriRepository clientRedirectUriRepository;
     private final OauthAuthorizationCodeRepository codeRepository;
     private final AuthorizationConsentService consentService;
 
-    /**
-     * 인가 엔드포인트 (아주 단순한 happy-path)
-     * 예:
-     * /oauth2/authorize?client_id=test-client&redirect_uri=http://localhost:3000/callback
-     */
     @GetMapping("/oauth2/authorize")
     public Object authorize(
             @RequestParam(value = "response_type", required = false) String responseType,
-            @RequestParam("client_id") String clientId,
-            @RequestParam("redirect_uri") String redirectUri,
+            @RequestParam(value = "client_id", required = false) String clientId,
+            @RequestParam(value = "redirect_uri", required = false) String redirectUri,
             @RequestParam(value = "scope", required = false) String scope,
             @RequestParam(value = "state", required = false) String state,
             @AuthenticationPrincipal UserDetails user,
             Model model
     ) {
-        /**
-         * responseType 이 없거나 빈 문자열 및 값이 없을 때
-         */
         if (responseType == null || responseType.isBlank()) {
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_request", state)))
                     .build();
         }
 
-        /**
-         * responseType에서 지원하지 않는 인증일 때
-         */
-        if (!responseType.equals("code")){
+        if (!responseType.equals("code")) {
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create(buildErrorRedirectUri(redirectUri, "unsupported_response_type", state)))
                     .build();
         }
 
-        /**
-         * client_id의 검증
-         */
-        if (clientId == null || clientId.isBlank()){
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_request", state)))
-                    .build();
+        if (clientId == null || clientId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // redirect_uri 형식 검증 (client 조회 전에 가능한 것)
+        if (redirectUri != null && redirectUri.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (redirectUri != null && redirectUri.contains("#")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        OauthClient client = clientRepository.findByClientIdAndActiveTrue(clientId)
+                .orElseThrow(() -> new IllegalArgumentException("invalid client"));
+
+        // redirect_uri 등록값 검증
+        List<String> registeredUris = clientRedirectUriRepository.findByClient_ClientId(clientId)
+                .stream()
+                .map(OauthClientRedirectUri::getRedirectUri)
+                .toList();
+
+        if (redirectUri == null) {
+            if (registeredUris.size() == 1) {
+                redirectUri = registeredUris.get(0);
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
+        } else if (!registeredUris.contains(redirectUri)) {
+            return ResponseEntity.badRequest().build();
         }
 
         String username = user.getUsername();
         List<String> requestedScopes = splitScopes(scope);
-        OauthClient client = clientRepository.findByClientIdAndActiveTrue(clientId)
-                .orElseThrow(() -> new IllegalArgumentException("invalid client"));
 
         if (consentService.hasConsent(username, client.getClientId(), requestedScopes)) {
             return issueAuthorizationCode(client, username, redirectUri, state);
