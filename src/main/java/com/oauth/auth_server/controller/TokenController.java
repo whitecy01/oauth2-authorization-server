@@ -61,7 +61,7 @@ public class TokenController {
     public ResponseEntity<Map<String, Object>> issueAccessToken(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
             @RequestParam(value = "grant_type", required = false) List<String> grantTypes,
-            @RequestParam("code") String code,
+            @RequestParam(value = "code", required = false) List<String> codes,
             @RequestParam("redirect_uri") String redirectUri,
             @RequestParam(value = "client_id", required = false) String clientId,
             @RequestParam(value = "client_secret", required = false) String clientSecret
@@ -80,9 +80,17 @@ public class TokenController {
             return error(HttpStatus.BAD_REQUEST, "unsupported_grant_type", "grant_type must be authorization_code");
         }
 
-        /**
-         * Base64로 된 거 꺼내기
-         */
+        if (codes == null || codes.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "code is required");
+        }
+        if (codes.size() > 1) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "code must not be duplicated");
+        }
+        String code = codes.get(0);
+        if (!StringUtils.hasText(code)) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "code is required");
+        }
+
         ClientCredentials credentials = resolveClientCredentials(authorizationHeader, clientId, clientSecret);
         if (credentials == null) {
             return invalidClient("client authentication is required");
