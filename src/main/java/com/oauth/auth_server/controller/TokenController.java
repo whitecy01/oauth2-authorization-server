@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -59,12 +60,22 @@ public class TokenController {
     @Transactional
     public ResponseEntity<Map<String, Object>> issueAccessToken(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
-            @RequestParam("grant_type") String grantType,
+            @RequestParam(value = "grant_type", required = false) List<String> grantTypes,
             @RequestParam("code") String code,
             @RequestParam("redirect_uri") String redirectUri,
             @RequestParam(value = "client_id", required = false) String clientId,
             @RequestParam(value = "client_secret", required = false) String clientSecret
     ) {
+        if (grantTypes == null || grantTypes.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "grant_type is required");
+        }
+        if (grantTypes.size() > 1) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "grant_type must not be duplicated");
+        }
+        String grantType = grantTypes.get(0);
+        if (!StringUtils.hasText(grantType)) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "grant_type is required");
+        }
         if (!"authorization_code".equals(grantType)) {
             return error(HttpStatus.BAD_REQUEST, "unsupported_grant_type", "grant_type must be authorization_code");
         }
