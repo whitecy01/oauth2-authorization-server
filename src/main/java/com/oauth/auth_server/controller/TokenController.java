@@ -62,7 +62,7 @@ public class TokenController {
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
             @RequestParam(value = "grant_type", required = false) List<String> grantTypes,
             @RequestParam(value = "code", required = false) List<String> codes,
-            @RequestParam("redirect_uri") String redirectUri,
+            @RequestParam(value = "redirect_uri", required = false) List<String> redirectUris,
             @RequestParam(value = "client_id", required = false) String clientId,
             @RequestParam(value = "client_secret", required = false) String clientSecret
     ) {
@@ -89,6 +89,17 @@ public class TokenController {
         String code = codes.get(0);
         if (!StringUtils.hasText(code)) {
             return error(HttpStatus.BAD_REQUEST, "invalid_request", "code is required");
+        }
+
+        if (redirectUris == null || redirectUris.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_grant", "redirect_uri is required");
+        }
+        if (redirectUris.size() > 1) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "redirect_uri must not be duplicated");
+        }
+        String redirectUri = redirectUris.get(0);
+        if (!StringUtils.hasText(redirectUri)) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_grant", "redirect_uri is required");
         }
 
         ClientCredentials credentials = resolveClientCredentials(authorizationHeader, clientId, clientSecret);
