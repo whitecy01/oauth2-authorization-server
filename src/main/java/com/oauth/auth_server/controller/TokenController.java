@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -59,19 +60,48 @@ public class TokenController {
     @Transactional
     public ResponseEntity<Map<String, Object>> issueAccessToken(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader,
-            @RequestParam("grant_type") String grantType,
-            @RequestParam("code") String code,
-            @RequestParam("redirect_uri") String redirectUri,
+            @RequestParam(value = "grant_type", required = false) List<String> grantTypes,
+            @RequestParam(value = "code", required = false) List<String> codes,
+            @RequestParam(value = "redirect_uri", required = false) List<String> redirectUris,
             @RequestParam(value = "client_id", required = false) String clientId,
             @RequestParam(value = "client_secret", required = false) String clientSecret
     ) {
+        if (grantTypes == null || grantTypes.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "grant_type is required");
+        }
+        if (grantTypes.size() > 1) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "grant_type must not be duplicated");
+        }
+        String grantType = grantTypes.get(0);
+        if (!StringUtils.hasText(grantType)) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "grant_type is required");
+        }
         if (!"authorization_code".equals(grantType)) {
             return error(HttpStatus.BAD_REQUEST, "unsupported_grant_type", "grant_type must be authorization_code");
         }
 
-        /**
-         * Base64로 된 거 꺼내기
-         */
+        if (codes == null || codes.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "code is required");
+        }
+        if (codes.size() > 1) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "code must not be duplicated");
+        }
+        String code = codes.get(0);
+        if (!StringUtils.hasText(code)) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "code is required");
+        }
+
+        if (redirectUris == null || redirectUris.isEmpty()) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_grant", "redirect_uri is required");
+        }
+        if (redirectUris.size() > 1) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", "redirect_uri must not be duplicated");
+        }
+        String redirectUri = redirectUris.get(0);
+        if (!StringUtils.hasText(redirectUri)) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_grant", "redirect_uri is required");
+        }
+
         ClientCredentials credentials = resolveClientCredentials(authorizationHeader, clientId, clientSecret);
         if (credentials == null) {
             return invalidClient("client authentication is required");
