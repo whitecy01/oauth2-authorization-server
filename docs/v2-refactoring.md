@@ -118,10 +118,10 @@ Validator / Service (단일 책임 컴포넌트)
 
 **무엇을 만드는가**
 
-- `oauth2/authorization/AuthorizationCodeRequestToken.java`
+- `oauth2/authorization/OAuth2AuthorizationCodeRequestAuthenticationToken.java`
   - HTTP 파라미터를 파싱해 정리한 불변 값 객체. Controller가 이 객체를 만들어 Provider에 넘긴다.
   - `String responseType`, `String clientId`, `String redirectUri`(nullable), `List<String> scopes`, `String state`(nullable), `String username`, `int rawScopeParamCount`(scope 파라미터 중복 검사용)
-  - SAS 참고: `OAuth2AuthorizationCodeRequestAuthenticationToken`
+  - SAS: `OAuth2AuthorizationCodeRequestAuthenticationToken`
 
 기존 코드 변경 없음 / 테스트 영향 없음
 
@@ -368,7 +368,7 @@ oauth2/
 │   ├── AuthorizationGrantType.java                 (작업 2-1)
 │   └── OAuth2AccessToken.java                      (작업 2-1)
 ├── authorization/
-│   ├── AuthorizationCodeRequestToken.java          (작업 1-3)
+│   ├── OAuth2AuthorizationCodeRequestAuthenticationToken.java  (작업 1-3)
 │   ├── AuthorizationCodeIssuedToken.java           (작업 1-5)
 │   ├── ConsentRequiredException.java               (작업 1-5)
 │   ├── AuthorizationCodeRequestValidator.java      (작업 1-4)
