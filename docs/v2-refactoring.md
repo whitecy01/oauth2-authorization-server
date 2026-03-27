@@ -127,52 +127,11 @@ Validator / Service (단일 책임 컴포넌트)
 
 ---
 
-### 작업 1-4: Validator 4개 생성
+### 작업 1-4: AuthorizationCodeRequestProvider 생성
 
 **왜 하는가**
 
-현재 Controller의 검증 로직은 하나의 메서드에 섞여 있어서, 예를 들어 `redirect_uri` 검증만 단독으로 테스트하는 게 불가능하다. 각 검증 규칙을 독립 클래스로 분리하면 MockMvc 없이 순수 Java 단위 테스트로 경계값을 검증할 수 있다.
-
-`AuthorizationCodeRequestValidator` 인터페이스를 정의하고, 4개의 구현체로 Controller의 검증 로직을 이동시킨다.
-
-```java
-void validate(AuthorizationCodeRequestToken token) throws OAuth2AuthorizationException;
-```
-
-**무엇을 만드는가**
-
-- `oauth2/authorization/validator/ResponseTypeValidator.java`
-  - `response_type`이 없거나 빈 값이면 `invalid_request`, `"code"`가 아니면 `unsupported_response_type`을 던진다.
-  - 현재 Controller L54-64 로직을 이동
-
-- `oauth2/authorization/validator/AuthorizationClientValidator.java`
-  - `client_id`가 없으면 `invalid_request`, 존재하지 않거나 비활성 클라이언트면 `invalid_client`를 던진다.
-  - `RegisteredClientRepository`로 `RegisteredClient`를 조회해 검증한다.
-  - 현재 Controller L66-79 로직을 이동
-
-- `oauth2/authorization/validator/RedirectUriValidator.java`
-  - `redirect_uri`가 비어 있거나, `#`을 포함하거나, 등록 목록에 없으면 `invalid_request`를 던진다.
-  - URI를 제공하지 않았는데 등록된 URI가 2개 이상이어도 `invalid_request`를 던진다.
-  - `RegisteredClient.redirectUris()`로 검증한다.
-  - 현재 Controller L71-95 로직을 이동
-
-- `oauth2/authorization/validator/ScopeValidator.java`
-  - `scope` 파라미터가 중복으로 넘어오거나, RFC §3.3 패턴에 맞지 않거나, 클라이언트 허용 범위를 벗어나면 `invalid_scope`를 던진다.
-  - `SCOPE_TOKEN_PATTERN`을 이 클래스로 이동한다.
-  - `RegisteredClient.scopes()`로 검증한다.
-  - 현재 Controller L97-126 로직을 이동
-
-**테스트**: 각 Validator별 단위 테스트 파일 4개. MockMvc 불필요, mock `RegisteredClientRepository`로 경계값 케이스 검증.
-
-기존 테스트 영향 없음 (Validator는 아직 Controller에 연결되지 않음)
-
----
-
-### 작업 1-5: AuthorizationCodeRequestProvider 생성
-
-**왜 하는가**
-
-Validator들을 만들었지만, 이것들을 어떤 순서로 호출하고 code를 어떻게 발급할지를 조율하는 컴포넌트가 없다. Provider가 그 역할을 한다. Controller는 Provider에 요청 컨텍스트만 넘기고, "동의 필요", "코드 발급 성공", "검증 실패" 중 어떤 결과인지만 받으면 된다.
+이것들을 어떤 순서로 호출하고 code를 어떻게 발급할지를 조율하는 컴포넌트가 없다. Provider가 그 역할을 한다. Controller는 Provider에 요청 컨텍스트만 넘기고, "동의 필요", "코드 발급 성공", "검증 실패" 중 어떤 결과인지만 받으면 된다.
 
 **무엇을 만드는가**
 
@@ -182,22 +141,22 @@ Validator들을 만들었지만, 이것들을 어떤 순서로 호출하고 code
 - `oauth2/authorization/ConsentRequiredException.java`
   - 사용자가 아직 동의하지 않은 경우 Provider가 던지는 예외. Controller가 이를 잡아서 동의 화면에 필요한 데이터(`RegisteredClient`, `username`, `requestedScopes`, 원본 파라미터들)를 model에 담아 뷰를 렌더링한다.
 
-- `oauth2/authorization/AuthorizationCodeRequestProvider.java`
-  - Validator 4개, `AuthorizationConsentService`, `OAuth2AuthorizationService`, `RegisteredClientRepository`를 주입받는다.
+- `oauth2/authorization/OAuth2AuthorizationCodeRequestAuthenticationProvider.java`
+  - `AuthorizationConsentService`, `OAuth2AuthorizationService`, `RegisteredClientRepository`를 주입받는다.
   - `process(token)`: 검증 → 동의 확인 → code 발급 또는 예외를 순서대로 수행한다.
-  - SAS 참고: `OAuth2AuthorizationCodeRequestAuthenticationProvider`
+  - SAS: `OAuth2AuthorizationCodeRequestAuthenticationProvider`
 
-**테스트**: Provider 단위 테스트. 각 Validator mock + ConsentService mock 조합으로 흐름 검증.
+**테스트**: Provider 단위 테스트. ConsentService mock 조합으로 흐름 검증.
 
 기존 테스트 영향 없음
 
 ---
 
-### 작업 1-6: AuthorizationController를 HTTP 어댑터로 교체
+### 작업 1-5: AuthorizationController를 HTTP 어댑터로 교체
 
 **왜 하는가**
 
-1-1 ~ 1-5에서 만든 컴포넌트들을 실제로 연결하는 단계다. Controller에서 비즈니스 로직을 모두 걷어내고, HTTP ↔ 도메인 변환만 남긴다. 기존 `@WebMvcTest` 테스트들은 Controller가 직접 검증 로직을 들고 있다는 가정으로 작성되어 있어서 함께 업데이트한다.
+1-1 ~ 1-4에서 만든 컴포넌트들을 실제로 연결하는 단계다. Controller에서 비즈니스 로직을 모두 걷어내고, HTTP ↔ 도메인 변환만 남긴다. 기존 `@WebMvcTest` 테스트들은 Controller가 직접 검증 로직을 들고 있다는 가정으로 작성되어 있어서 함께 업데이트한다.
 
 **Controller 변경 내용**
 
@@ -226,10 +185,9 @@ Validator들을 만들었지만, 이것들을 어떤 순서로 호출하고 code
 | 일차 | 작업 | 산출물 |
 |------|------|--------|
 | Day 1 | 작업 1-1, 1-2 | OAuth2Error, OAuth2AuthorizationException, RegisteredClient, RegisteredClientRepository, OAuth2AuthorizationService |
-| Day 2 | 작업 1-3, 1-4 (Validator 2개) | AuthorizationCodeRequestToken, ResponseTypeValidator, AuthorizationClientValidator + 단위 테스트 |
-| Day 3 | 작업 1-4 나머지 (Validator 2개) | RedirectUriValidator, ScopeValidator + 단위 테스트 |
-| Day 4 | 작업 1-5 | AuthorizationCodeIssuedToken, ConsentRequiredException, AuthorizationCodeRequestProvider + 단위 테스트 |
-| Day 5 | 작업 1-6 | AuthorizationController 교체, 기존 테스트 5개 업데이트, E2E 테스트 통과 확인 |
+| Day 2 | 작업 1-3 | OAuth2AuthorizationCodeRequestAuthenticationToken |
+| Day 3 | 작업 1-4 | AuthorizationCodeIssuedToken, ConsentRequiredException, AuthorizationCodeRequestProvider + 단위 테스트 |
+| Day 4 | 작업 1-5 | AuthorizationController 교체, 기존 테스트 5개 업데이트, E2E 테스트 통과 확인 |
 
 ---
 
@@ -369,15 +327,9 @@ oauth2/
 │   └── OAuth2AccessToken.java                      (작업 2-1)
 ├── authorization/
 │   ├── OAuth2AuthorizationCodeRequestAuthenticationToken.java  (작업 1-3)
-│   ├── AuthorizationCodeIssuedToken.java           (작업 1-5)
-│   ├── ConsentRequiredException.java               (작업 1-5)
-│   ├── AuthorizationCodeRequestValidator.java      (작업 1-4)
-│   ├── validator/
-│   │   ├── ResponseTypeValidator.java              (작업 1-4)
-│   │   ├── AuthorizationClientValidator.java       (작업 1-4)
-│   │   ├── RedirectUriValidator.java               (작업 1-4)
-│   │   └── ScopeValidator.java                     (작업 1-4)
-│   └── AuthorizationCodeRequestProvider.java       (작업 1-5)
+│   ├── AuthorizationCodeIssuedToken.java           (작업 1-4)
+│   ├── ConsentRequiredException.java               (작업 1-4)
+│   └── OAuth2AuthorizationCodeRequestAuthenticationProvider.java  (작업 1-4)
 ├── token/
 │   ├── AuthorizationCodeTokenRequest.java          (작업 2-2)
 │   ├── ClientCredentials.java                      (작업 2-2)
