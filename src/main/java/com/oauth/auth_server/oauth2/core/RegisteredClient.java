@@ -12,6 +12,7 @@ public class RegisteredClient implements Serializable {
     private static final long serialVersionUID = -717282636175335081L;
 
     private String clientId;
+    private String clientName;
     private String clientSecret;
     private Set<String> redirectUris;
     private Set<String> scopes;
@@ -22,6 +23,10 @@ public class RegisteredClient implements Serializable {
 
     public String getClientId() {
         return clientId;
+    }
+
+    public String getClientName() {
+        return clientName;
     }
 
     public String getClientSecret() {
@@ -47,6 +52,7 @@ public class RegisteredClient implements Serializable {
     public static class Builder {
 
         private String clientId;
+        private String clientName;
         private String clientSecret;
         private final Set<String> redirectUris = new HashSet<>();
         private final Set<String> scopes = new HashSet<>();
@@ -57,6 +63,11 @@ public class RegisteredClient implements Serializable {
 
         public Builder clientId(String clientId) {
             this.clientId = clientId;
+            return this;
+        }
+
+        public Builder clientName(String clientName) {
+            this.clientName = clientName;
             return this;
         }
 
@@ -86,6 +97,7 @@ public class RegisteredClient implements Serializable {
             }
             RegisteredClient client = new RegisteredClient();
             client.clientId = this.clientId;
+            client.clientName = this.clientName;
             client.clientSecret = this.clientSecret;
             client.redirectUris = Collections.unmodifiableSet(new HashSet<>(this.redirectUris));
             client.scopes = Collections.unmodifiableSet(new HashSet<>(this.scopes));

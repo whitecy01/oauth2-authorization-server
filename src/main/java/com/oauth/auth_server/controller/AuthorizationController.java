@@ -1,21 +1,15 @@
 package com.oauth.auth_server.controller;
 
-import com.oauth.auth_server.entity.OauthAuthorizationCode;
-import com.oauth.auth_server.clientregistration.entity.OauthClient;
-import com.oauth.auth_server.clientregistration.entity.OauthClientRedirectUri;
-import com.oauth.auth_server.clientregistration.entity.OauthClientScope;
-import com.oauth.auth_server.repository.OauthAuthorizationCodeRepository;
-import com.oauth.auth_server.clientregistration.repository.OauthClientRedirectUriRepository;
-import com.oauth.auth_server.clientregistration.repository.OauthClientRepository;
-import com.oauth.auth_server.clientregistration.repository.OauthClientScopeRepository;
+import com.oauth.auth_server.oauth2.authorization.AuthorizationCodeIssuedToken;
+import com.oauth.auth_server.oauth2.authorization.ConsentRequiredException;
+import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationException;
+import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationProvider;
+import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationToken;
 import com.oauth.auth_server.service.AuthorizationConsentService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,13 +25,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Controller
 @RequiredArgsConstructor
 public class AuthorizationController {
-    // RFC 6749 §3.3: scope-token = 1*( %x21 / %x23-5B / %x5D-7E )
-    private static final Pattern SCOPE_TOKEN_PATTERN = Pattern.compile("[\\x21\\x23-\\x5B\\x5D-\\x7E]+");
 
-    private final OauthClientRepository clientRepository;
-    private final OauthClientRedirectUriRepository clientRedirectUriRepository;
-    private final OauthClientScopeRepository clientScopeRepository;
-    private final OauthAuthorizationCodeRepository codeRepository;
+    private final OAuth2AuthorizationCodeRequestAuthenticationProvider provider;
     private final AuthorizationConsentService consentService;
 
     @GetMapping("/oauth2/authorize")
@@ -51,95 +40,41 @@ public class AuthorizationController {
             HttpServletRequest request,
             Model model
     ) {
-        if (responseType == null || responseType.isBlank()) {
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_request", state)))
-                    .build();
-        }
-
-        if (!responseType.equals("code")) {
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(buildErrorRedirectUri(redirectUri, "unsupported_response_type", state)))
-                    .build();
-        }
-
-        if (clientId == null || clientId.isBlank()) {
+        // client_id 파라미터 자체가 없는 경우 → redirect_uri 를 신뢰할 수 없으므로 400
+        if (clientId == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        // redirect_uri 형식 검증 (client 조회 전에 가능한 것)
-        if (redirectUri != null && redirectUri.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        if (redirectUri != null && redirectUri.contains("#")) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        OauthClient client = clientRepository.findByClientIdAndActiveTrue(clientId)
-                .orElseThrow(() -> new IllegalArgumentException("invalid client"));
-
-        // redirect_uri 등록값 검증
-        List<String> registeredUris = clientRedirectUriRepository.findByClient_ClientId(clientId)
-                .stream()
-                .map(OauthClientRedirectUri::getRedirectUri)
-                .toList();
-
-        if (redirectUri == null) {
-            if (registeredUris.size() == 1) {
-                redirectUri = registeredUris.get(0);
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
-        } else if (!registeredUris.contains(redirectUri)) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        // scope 중복 파라미터 검사 (scope=read&scope=write 형태 불허)
         String[] scopeValues = request.getParameterValues("scope");
-        if (scopeValues != null && scopeValues.length > 1) {
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_scope", state)))
-                    .build();
-        }
+        int rawScopeParamCount = scopeValues != null ? scopeValues.length : 0;
 
-        List<String> requestedScopes = splitScopes(scope);
+        OAuth2AuthorizationCodeRequestAuthenticationToken token =
+                new OAuth2AuthorizationCodeRequestAuthenticationToken(
+                        responseType, clientId, redirectUri,
+                        splitScopes(scope), state,
+                        user.getUsername(), rawScopeParamCount);
 
-        // scope 형식 및 등록값 검증
-        if (!requestedScopes.isEmpty()) {
-            List<String> allowedScopes = clientScopeRepository.findByClient_ClientId(clientId)
-                    .stream()
-                    .map(OauthClientScope::getScope)
-                    .toList();
+        try {
+            AuthorizationCodeIssuedToken issued = provider.process(token);
+            return buildCodeRedirect(issued);
 
-            for (String token : requestedScopes) {
-                if (!SCOPE_TOKEN_PATTERN.matcher(token).matches()) {
-                    return ResponseEntity.status(HttpStatus.FOUND)
-                            .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_scope", state)))
-                            .build();
-                }
-                if (!allowedScopes.contains(token)) {
-                    return ResponseEntity.status(HttpStatus.FOUND)
-                            .location(URI.create(buildErrorRedirectUri(redirectUri, "invalid_scope", state)))
-                            .build();
-                }
+        } catch (ConsentRequiredException e) {
+            model.addAttribute("client", e.getRegisteredClient());
+            model.addAttribute("username", e.getUsername());
+            model.addAttribute("requestedScopes", e.getRequestedScopes());
+            model.addAttribute("responseType", responseType);
+            model.addAttribute("clientId", clientId);
+            model.addAttribute("redirectUri", redirectUri);
+            model.addAttribute("scope", scope == null ? "" : scope);
+            model.addAttribute("state", state == null ? "" : state);
+            return "oauth2/consent";
+
+        } catch (OAuth2AuthorizationCodeRequestAuthenticationException e) {
+            if (e.getRedirectUri() != null) {
+                return buildErrorRedirect(e.getRedirectUri(), e.getError().getErrorCode(), e.getState());
             }
+            return ResponseEntity.badRequest().build();
         }
-
-        String username = user.getUsername();
-
-        if (consentService.hasConsent(username, client.getClientId(), requestedScopes)) {
-            return issueAuthorizationCode(client, username, redirectUri, state);
-        }
-        System.out.println("AuthorizationController : " + client.getClientId());
-        model.addAttribute("client", client);
-        model.addAttribute("username", username);
-        model.addAttribute("requestedScopes", requestedScopes);
-        model.addAttribute("responseType", responseType);
-        model.addAttribute("clientId", clientId);
-        model.addAttribute("redirectUri", redirectUri);
-        model.addAttribute("scope", scope == null ? "" : scope);
-        model.addAttribute("state", state == null ? "" : state);
-        return "oauth2/consent";
     }
 
     @PostMapping("/oauth2/authorize")
@@ -151,67 +86,49 @@ public class AuthorizationController {
             @RequestParam("action") String action,
             @AuthenticationPrincipal UserDetails user
     ) {
-        String username = user.getUsername();
-        List<String> requestedScopes = splitScopes(scope);
-        OauthClient client = clientRepository.findByClientIdAndActiveTrue(clientId)
-                .orElseThrow(() -> new IllegalArgumentException("invalid client"));
-
         if ("deny".equals(action)) {
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(buildErrorRedirectUri(redirectUri, "access_denied", state)))
-                    .build();
+            return buildErrorRedirect(redirectUri, "access_denied", state);
         }
 
-        consentService.saveConsent(username, client.getClientId(), requestedScopes);
-        return issueAuthorizationCode(client, username, redirectUri, state);
+        String username = user.getUsername();
+        List<String> scopes = splitScopes(scope);
+
+        consentService.saveConsent(username, clientId, scopes);
+        AuthorizationCodeIssuedToken issued = provider.issueCode(clientId, username, redirectUri, state, scopes);
+        return buildCodeRedirect(issued);
+    }
+
+    private ResponseEntity<Void> buildCodeRedirect(AuthorizationCodeIssuedToken issued) {
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUriString(issued.getRedirectUri())
+                .queryParam("code", issued.getCode());
+        if (issued.getState() != null && !issued.getState().isBlank()) {
+            builder.queryParam("state", issued.getState());
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(builder.toUriString()))
+                .build();
+    }
+
+    private ResponseEntity<Void> buildErrorRedirect(String redirectUri, String error, String state) {
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUriString(redirectUri)
+                .queryParam("error", error);
+        if (state != null && !state.isBlank()) {
+            builder.queryParam("state", state);
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(builder.toUriString()))
+                .build();
     }
 
     private List<String> splitScopes(String scope) {
         if (scope == null || scope.isBlank()) {
             return List.of();
         }
-
         return Arrays.stream(scope.trim().split("\\s+"))
-                .filter(value -> !value.isBlank())
+                .filter(s -> !s.isBlank())
                 .distinct()
                 .toList();
-    }
-
-    private ResponseEntity<Void> issueAuthorizationCode(
-            OauthClient client,
-            String username,
-            String redirectUri,
-            String state
-    ) {
-        String code = UUID.randomUUID().toString().replace("-", "");
-        Instant expiresAt = Instant.now().plusSeconds(600);
-
-        codeRepository.save(new OauthAuthorizationCode(
-                code,
-                client.getClientId(),
-                username,
-                redirectUri,
-                state,
-                expiresAt
-        ));
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(redirectUri)
-                .queryParam("code", code);
-        if (state != null && !state.isBlank()) {
-            builder.queryParam("state", state);
-        }
-
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create(builder.toUriString()))
-                .build();
-    }
-
-    private String buildErrorRedirectUri(String redirectUri, String error, String state) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(redirectUri)
-                .queryParam("error", error);
-        if (state != null && !state.isBlank()) {
-            builder.queryParam("state", state);
-        }
-        return builder.toUriString();
     }
 }

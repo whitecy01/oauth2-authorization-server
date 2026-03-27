@@ -127,7 +127,7 @@ Validator / Service (단일 책임 컴포넌트)
 
 ---
 
-### 작업 1-4: AuthorizationCodeRequestProvider 생성
+### 
 
 **왜 하는가**
 

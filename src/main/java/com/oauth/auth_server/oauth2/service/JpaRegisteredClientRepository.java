@@ -37,6 +37,7 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
 
                     RegisteredClient.Builder builder = RegisteredClient.builder()
                             .clientId(client.getClientId())
+                            .clientName(client.getClientName())
                             .clientSecret(client.getClientSecret())
                             .active(client.isActive());
                     redirectUris.forEach(builder::redirectUri);
