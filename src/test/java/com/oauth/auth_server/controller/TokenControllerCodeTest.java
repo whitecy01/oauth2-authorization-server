@@ -1,21 +1,17 @@
 package com.oauth.auth_server.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.oauth.auth_server.clientregistration.entity.OauthClient;
-import com.oauth.auth_server.clientregistration.entity.OauthClientRedirectUri;
-import com.oauth.auth_server.clientregistration.repository.OauthClientRedirectUriRepository;
-import com.oauth.auth_server.clientregistration.repository.OauthClientRepository;
 import com.oauth.auth_server.config.SecurityConfig;
-import com.oauth.auth_server.repository.OauthAccessTokenRepository;
-import com.oauth.auth_server.repository.OauthAuthorizationCodeRepository;
+import com.oauth.auth_server.oauth2.core.OAuth2AuthorizationException;
+import com.oauth.auth_server.oauth2.core.OAuth2Error;
+import com.oauth.auth_server.oauth2.token.AuthorizationCodeTokenProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -41,16 +37,7 @@ class TokenControllerCodeTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private OauthClientRepository clientRepository;
-
-    @MockitoBean
-    private OauthClientRedirectUriRepository redirectUriRepository;
-
-    @MockitoBean
-    private OauthAuthorizationCodeRepository authorizationCodeRepository;
-
-    @MockitoBean
-    private OauthAccessTokenRepository accessTokenRepository;
+    private AuthorizationCodeTokenProvider provider;
 
     private static final String CLIENT_ID = "test-client";
     private static final String CLIENT_SECRET = "secret";
@@ -64,6 +51,9 @@ class TokenControllerCodeTest {
      */
     @Test
     void token_withoutCode_returnsInvalidRequest() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_request", "code is required", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "authorization_code")
@@ -77,6 +67,9 @@ class TokenControllerCodeTest {
      */
     @Test
     void token_withBlankCode_returnsInvalidRequest() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_request", "code is required", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "authorization_code")
@@ -92,6 +85,9 @@ class TokenControllerCodeTest {
      */
     @Test
     void token_withDuplicateCode_returnsInvalidRequest() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_request", "code must not be duplicated", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "authorization_code")
@@ -108,12 +104,8 @@ class TokenControllerCodeTest {
      */
     @Test
     void token_withNonExistentCode_returnsInvalidGrant() throws Exception {
-        OauthClient client = new OauthClient(CLIENT_ID, CLIENT_SECRET, true, "Test Client");
-        OauthClientRedirectUri registeredUri = new OauthClientRedirectUri(client, REDIRECT_URI);
-
-        given(clientRepository.findByClientIdAndActiveTrue(CLIENT_ID)).willReturn(Optional.of(client));
-        given(redirectUriRepository.findByClient_ClientId(CLIENT_ID)).willReturn(List.of(registeredUri));
-        given(authorizationCodeRepository.findByCode("nonexistent-code")).willReturn(Optional.empty());
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_grant", "authorization code is invalid", null)));
 
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
