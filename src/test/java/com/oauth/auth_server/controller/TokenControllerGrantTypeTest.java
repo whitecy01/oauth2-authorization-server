@@ -1,14 +1,15 @@
 package com.oauth.auth_server.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.oauth.auth_server.clientregistration.repository.OauthClientRedirectUriRepository;
-import com.oauth.auth_server.clientregistration.repository.OauthClientRepository;
 import com.oauth.auth_server.config.SecurityConfig;
-import com.oauth.auth_server.repository.OauthAccessTokenRepository;
-import com.oauth.auth_server.repository.OauthAuthorizationCodeRepository;
+import com.oauth.auth_server.oauth2.core.OAuth2AuthorizationException;
+import com.oauth.auth_server.oauth2.core.OAuth2Error;
+import com.oauth.auth_server.oauth2.token.AuthorizationCodeTokenProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -33,16 +34,7 @@ class TokenControllerGrantTypeTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private OauthClientRepository clientRepository;
-
-    @MockitoBean
-    private OauthClientRedirectUriRepository redirectUriRepository;
-
-    @MockitoBean
-    private OauthAuthorizationCodeRepository authorizationCodeRepository;
-
-    @MockitoBean
-    private OauthAccessTokenRepository accessTokenRepository;
+    private AuthorizationCodeTokenProvider provider;
 
     private static final String DUMMY_CODE = "dummy-code";
     private static final String DUMMY_REDIRECT_URI = "http://localhost:8080/callback";
@@ -53,6 +45,9 @@ class TokenControllerGrantTypeTest {
      */
     @Test
     void token_withoutGrantType_returnsInvalidRequest() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_request", "grant_type is required", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("code", DUMMY_CODE)
@@ -66,6 +61,9 @@ class TokenControllerGrantTypeTest {
      */
     @Test
     void token_withBlankGrantType_returnsInvalidRequest() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_request", "grant_type is required", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "")
@@ -81,6 +79,9 @@ class TokenControllerGrantTypeTest {
      */
     @Test
     void token_withDuplicateGrantType_returnsInvalidRequest() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_request", "grant_type must not be duplicated", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "authorization_code")
@@ -96,6 +97,9 @@ class TokenControllerGrantTypeTest {
      */
     @Test
     void token_withRefreshTokenGrantType_returnsUnsupportedGrantType() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("unsupported_grant_type", "grant_type must be authorization_code", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "refresh_token")
@@ -110,6 +114,9 @@ class TokenControllerGrantTypeTest {
      */
     @Test
     void token_withClientCredentialsGrantType_returnsUnsupportedGrantType() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("unsupported_grant_type", "grant_type must be authorization_code", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "client_credentials")
@@ -124,6 +131,9 @@ class TokenControllerGrantTypeTest {
      */
     @Test
     void token_withUnknownGrantType_returnsUnsupportedGrantType() throws Exception {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("unsupported_grant_type", "grant_type must be authorization_code", null)));
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "foo")

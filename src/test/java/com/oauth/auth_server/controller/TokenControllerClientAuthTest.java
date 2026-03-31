@@ -1,20 +1,18 @@
 package com.oauth.auth_server.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.oauth.auth_server.clientregistration.entity.OauthClient;
-import com.oauth.auth_server.clientregistration.repository.OauthClientRedirectUriRepository;
-import com.oauth.auth_server.clientregistration.repository.OauthClientRepository;
 import com.oauth.auth_server.config.SecurityConfig;
-import com.oauth.auth_server.repository.OauthAccessTokenRepository;
-import com.oauth.auth_server.repository.OauthAuthorizationCodeRepository;
+import com.oauth.auth_server.oauth2.core.OAuth2AuthorizationException;
+import com.oauth.auth_server.oauth2.core.OAuth2Error;
+import com.oauth.auth_server.oauth2.token.AuthorizationCodeTokenProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -38,16 +36,7 @@ class TokenControllerClientAuthTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private OauthClientRepository clientRepository;
-
-    @MockitoBean
-    private OauthClientRedirectUriRepository redirectUriRepository;
-
-    @MockitoBean
-    private OauthAuthorizationCodeRepository authorizationCodeRepository;
-
-    @MockitoBean
-    private OauthAccessTokenRepository accessTokenRepository;
+    private AuthorizationCodeTokenProvider provider;
 
     private static final String DUMMY_CODE = "dummy-code";
     private static final String REDIRECT_URI = "http://localhost:8080/callback";
@@ -58,12 +47,19 @@ class TokenControllerClientAuthTest {
         return "Basic " + encoded;
     }
 
+    private void givenProviderThrowsInvalidClient() {
+        given(provider.process(any())).willThrow(
+                new OAuth2AuthorizationException(new OAuth2Error("invalid_client", "invalid client credentials", null)));
+    }
+
     /**
      * Authorization 헤더도, client_id/client_secret 폼 파라미터도 없으면
      * 클라이언트 인증 자체가 불가능하므로 invalid_client 를 반환해야 한다.
      */
     @Test
     void token_withoutAnyClientCredentials_returnsInvalidClient() throws Exception {
+        givenProviderThrowsInvalidClient();
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "authorization_code")
@@ -79,6 +75,8 @@ class TokenControllerClientAuthTest {
      */
     @Test
     void token_withoutClientSecret_returnsInvalidClient() throws Exception {
+        givenProviderThrowsInvalidClient();
+
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("grant_type", "authorization_code")
@@ -95,8 +93,7 @@ class TokenControllerClientAuthTest {
      */
     @Test
     void token_withUnregisteredClientId_returnsInvalidClient() throws Exception {
-        given(clientRepository.findByClientIdAndActiveTrue("unknown-client"))
-                .willReturn(Optional.empty());
+        givenProviderThrowsInvalidClient();
 
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -114,9 +111,7 @@ class TokenControllerClientAuthTest {
      */
     @Test
     void token_withWrongClientSecret_returnsInvalidClient() throws Exception {
-        OauthClient client = new OauthClient("test-client", "correct-secret", true, "Test Client");
-        given(clientRepository.findByClientIdAndActiveTrue("test-client"))
-                .willReturn(Optional.of(client));
+        givenProviderThrowsInvalidClient();
 
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -130,13 +125,11 @@ class TokenControllerClientAuthTest {
     }
 
     /**
-     * active=false 인 클라이언트는 findByClientIdAndActiveTrue 에서 걸러지므로
-     * invalid_client 를 반환해야 한다.
+     * active=false 인 클라이언트는 invalid_client 를 반환해야 한다.
      */
     @Test
     void token_withInactiveClient_returnsInvalidClient() throws Exception {
-        given(clientRepository.findByClientIdAndActiveTrue("inactive-client"))
-                .willReturn(Optional.empty());
+        givenProviderThrowsInvalidClient();
 
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
