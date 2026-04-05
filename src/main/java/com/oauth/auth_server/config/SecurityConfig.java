@@ -1,5 +1,7 @@
 package com.oauth.auth_server.config;
 
+import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationEndpointFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -9,26 +11,33 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
-    @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                // 개발 초기에는 CSRF 끄는 게 테스트 편함(나중에 다시 켜도 됨)
-                .csrf(csrf -> csrf.disable())
 
-                // 인가 서버 엔드포인트는 인증 필요
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http,
+            OAuth2AuthorizationEndpointFilter authorizationEndpointFilter) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/error", "/admin/**", "/oauth2/token", "/oauth2/token-page", "/resource/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                // 기본 폼 로그인 페이지 사용
                 .formLogin(Customizer.withDefaults())
-                // 로그아웃도 기본 제공
-                .logout(Customizer.withDefaults());
+                .logout(Customizer.withDefaults())
+                .addFilterAfter(authorizationEndpointFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    FilterRegistrationBean<OAuth2AuthorizationEndpointFilter> authorizationEndpointFilterRegistration(
+            OAuth2AuthorizationEndpointFilter filter) {
+        FilterRegistrationBean<OAuth2AuthorizationEndpointFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

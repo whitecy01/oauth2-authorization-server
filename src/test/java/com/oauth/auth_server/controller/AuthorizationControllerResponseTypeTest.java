@@ -17,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationEndpointFilter;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,6 +35,9 @@ class AuthorizationControllerResponseTypeTest {
 
     @MockitoBean
     private AuthorizationConsentService consentService;
+
+    @MockitoBean
+    private OAuth2AuthorizationEndpointFilter authorizationEndpointFilter;
 
     private static final String REDIRECT_URI = "http://localhost:8080/callback";
 

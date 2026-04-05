@@ -61,152 +61,99 @@
 - `@WebMvcTest` 테스트 4개 → Provider mock 기반으로 교체
 - `./gradlew test` + `TokenEndPointE2ETest` 통과 확인
 
----
 
-## 4월 4일 (토) — 작업 2-5: Dead Code 제거 + 전체 검증
+# 2주차 — 인가 엔드포인트 (Filter 기반)
 
-- `SimpleClient.java` 삭제
-- `./gradlew test` 전체 최종 통과 확인
-
----
-
-
-# 2주차 — 인가 엔드포인트 v3 (Filter 기반)
-
-## 4월 5일 (월) — 설계
-
-- Filter → Converter → Provider 흐름 설계
-- SAS `OAuth2AuthorizationEndpointFilter` 구조 분석
-- 브랜치 전략 확정 (`v3/filter-based`)
-
----
-
-## 4월 6일 (화) — OAuth2AuthorizationEndpointFilter 구현
+## 4월 4일 (토) — OAuth2AuthorizationEndpointFilter 구현
 
 - `/oauth2/authorize` 요청을 Filter에서 가로채기
 - Converter 호출 → `AuthenticationToken` 생성 → Provider 위임
 - Controller 역할 축소 준비
 
----
 
-## 4월 7일 (수) — Converter 구현
+## 4월 5일 (일) — Converter 구현
 
 - HTTP 파라미터 → `OAuth2AuthorizationCodeRequestAuthenticationToken` 변환
 - 중복 파라미터 카운트 처리
 - Filter → Converter → Token 연결
 
----
 
-## 4월 8일 (목) — Provider 연결
+## 4월 6일 (월) — Provider 연결
 
 - Filter에서 Provider로 위임
 - `AuthorizationCodeIssuedToken` / `ConsentRequiredException` 처리
 - Filter에서 HTTP 응답 작성 (redirect, 동의 화면, 에러)
 
----
 
-## 4월 9일 (금) — 흐름 마무리 + E2E 테스트
+## 4월 7일 (화) — 흐름 마무리 + E2E 테스트
 
 - 성공 흐름 (code 발급 → redirect)
 - 동의 흐름 (consent 화면 렌더링)
 - 실패 흐름 (redirect 가능 / 불가 에러)
 - `AuthorizationEndpointE2ETest` 통과 확인
 
----
-
-## 4월 10일 (토) — 테스트 정리
-
+## 4월 8일 (수) — 흐름 마무리 + E2E 테스트
 - authorize E2E 시나리오 표 작성 (정상 / 실패 / redirect 여부 / error 코드)
 - 단위 테스트 보강
 
----
 
 # 3주차 — 토큰 엔드포인트 v3 (Filter 기반) + 오류/lifecycle 강화
 
-## 4월 11일 (월) — 토큰 엔드포인트 Filter 설계
-
-- `OAuth2TokenEndpointFilter` 구조 설계
-- SAS `OAuth2TokenEndpointFilter` 참고
-
----
-
-## 4월 12일 (화) — Filter + Converter 구현
-
+## 4월 9일 (목) — Filter + Converter 구현
 - `/oauth2/token` 요청 Filter 처리
 - `AuthorizationCodeTokenRequest` Converter 연결
 
----
 
-## 4월 13일 (수) — Provider 연결 + E2E 테스트
+## 4월 10일 (금) — Provider 연결 + E2E 테스트
 
 - Filter → Provider 위임
 - `TokenEndPointE2ETest` 통과 확인
 
----
-
-## 4월 14일 (목) — 오류 응답 강화
+## 4월 11일 (토) — 오류 응답 강화
 
 - `error_description` 추가
 - `error_uri` 추가
 - 공통 에러 처리 구조 정리
 
----
-
-## 4월 15일 (금) — code lifecycle 강화
+## 4월 12일 (일) — code lifecycle 강화
 
 - `issuedAt` / `expiresAt` 검증
 - 재사용 방지
 - 만료 처리 정책 + 테스트
 
----
 
-## 4월 16일 (토) — 실패 케이스 확대
+## 4월 13일 (월) — 실패 케이스 확대
 
 - `invalid_request` / `invalid_client` / `invalid_grant` / `unsupported_grant_type`
 - token E2E 시나리오 표 작성
 
----
 
 # 4주차 — 테스트 / 문서화
 
-## 4월 17일 (월)
-
+## 4월 14일 (화) - authorize E2E 시나리오 최종 정리
 - authorize E2E 시나리오 최종 정리
     - 정상 / 실패 / redirect 여부 / error 코드 / state 포함 여부
 
----
-
-## 4월 18일 (화)
-
+## 4월 15일 (수) - token E2E 시나리오 최종 정리
 - token E2E 시나리오 최종 정리
     - authorization_code 흐름
     - invalid_client / invalid_grant
 
----
-
-## 4월 19일 (수)
+## 4월 16일 (목) - 정상 / 실패 케이스 RFC 6749 기준 대조 정리
 
 - 정상 / 실패 케이스 RFC 6749 기준 대조 정리
 
----
-
-## 4월 20일 (목)
-
+## 4월 17일 (금) - validator / unit / integration / e2e 테스트 구분 문서화
 - validator / unit / integration / e2e 테스트 구분 문서화
 
----
-
-## 4월 21일 (금)
+## 4월 18일 (토) - 구조 그림 정리
 
 - 구조 그림 정리
     - v2 구조 (Controller-adapter)
     - v3 구조 (Filter-based)
     - v2 → v3 전환 흐름
 
----
-
-## 4월 22일 (토) 
-
+## 4월 19일 (일) - 최종 정리
 - README 정리
 - `./gradlew test` 전체 실행
 - 구조 / 테스트 / 문서 최종 점검
@@ -216,7 +163,7 @@
 
 ## 반드시
 - 토큰 엔드포인트 v2 완성 (작업 2-1 ~ 2-5)
-- v3 Filter → Converter → Provider 구조 전환
+- Filter → Converter → Provider 구조 전환
 - authorization_code 교환 흐름
 - code 1회용 / 만료 처리
 - E2E 시나리오 검증

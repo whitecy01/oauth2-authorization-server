@@ -5,6 +5,7 @@ import com.oauth.auth_server.oauth2.authorization.ConsentRequiredException;
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationException;
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationProvider;
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationToken;
+import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationEndpointFilter;
 import com.oauth.auth_server.service.AuthorizationConsentService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -75,6 +76,27 @@ public class AuthorizationController {
             }
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    /**
+     * OAuth2AuthorizationEndpointFilter가 동의 필요 시 forward 하는 내부 엔드포인트.
+     * request attribute에서 ConsentRequiredException을 꺼내 동의 화면을 렌더링한다.
+     */
+    @GetMapping("/oauth2/consent-view")
+    public String showConsentView(HttpServletRequest request, Model model) {
+        ConsentRequiredException e =
+                (ConsentRequiredException) request.getAttribute(OAuth2AuthorizationEndpointFilter.CONSENT_EXCEPTION_ATTR);
+        OAuth2AuthorizationCodeRequestAuthenticationToken authRequest = e.getAuthorizationRequest();
+
+        model.addAttribute("client", e.getRegisteredClient());
+        model.addAttribute("username", e.getUsername());
+        model.addAttribute("requestedScopes", e.getRequestedScopes());
+        model.addAttribute("responseType", authRequest.getResponseType());
+        model.addAttribute("clientId", authRequest.getClientId());
+        model.addAttribute("redirectUri", authRequest.getRedirectUri() == null ? "" : authRequest.getRedirectUri());
+        model.addAttribute("scope", String.join(" ", authRequest.getScopes()));
+        model.addAttribute("state", authRequest.getState() == null ? "" : authRequest.getState());
+        return "oauth2/consent";
     }
 
     @PostMapping("/oauth2/authorize")
