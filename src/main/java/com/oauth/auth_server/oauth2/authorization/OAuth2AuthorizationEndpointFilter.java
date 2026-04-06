@@ -8,7 +8,6 @@ import java.io.IOException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -18,7 +17,6 @@ import org.springframework.web.util.UriComponentsBuilder;
  *
  * SAS 참고: OAuth2AuthorizationEndpointFilter
  */
-@Component
 public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
 
     private static final String AUTHORIZATION_URI = "/oauth2/authorize";
