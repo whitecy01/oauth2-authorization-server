@@ -87,7 +87,7 @@ public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
 
         } catch (OAuth2AuthorizationCodeRequestAuthenticationException e) {
             if (e.getRedirectUri() != null) {
-                sendErrorRedirect(response, e.getRedirectUri(), e.getError().getErrorCode(), e.getState());
+                sendErrorRedirect(response, e.getRedirectUri(), e.getError(), e.getState());
             } else {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST);
             }
@@ -111,10 +111,16 @@ public class OAuth2AuthorizationEndpointFilter extends OncePerRequestFilter {
     }
 
     private void sendErrorRedirect(HttpServletResponse response, String redirectUri,
-            String error, String state) throws IOException {
+            com.oauth.auth_server.oauth2.core.OAuth2Error error, String state) throws IOException {
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromUriString(redirectUri)
-                .queryParam("error", error);
+                .queryParam("error", error.getErrorCode());
+        if (StringUtils.hasText(error.getDescription())) {
+            builder.queryParam("error_description", error.getDescription());
+        }
+        if (StringUtils.hasText(error.getUri())) {
+            builder.queryParam("error_uri", error.getUri());
+        }
         if (StringUtils.hasText(state)) {
             builder.queryParam("state", state);
         }

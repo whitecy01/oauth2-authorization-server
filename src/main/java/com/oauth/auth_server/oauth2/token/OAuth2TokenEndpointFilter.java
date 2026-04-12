@@ -77,7 +77,12 @@ public class OAuth2TokenEndpointFilter extends OncePerRequestFilter {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", errorCode);
-        body.put("error_description", e.getError().getDescription());
+        if (e.getError().getDescription() != null) {
+            body.put("error_description", e.getError().getDescription());
+        }
+        if (e.getError().getUri() != null) {
+            body.put("error_uri", e.getError().getUri());
+        }
 
         if ("invalid_client".equals(errorCode)) {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
