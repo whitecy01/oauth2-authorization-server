@@ -56,6 +56,7 @@ public class TokenEndPointE2ETest {
                 USERNAME,
                 REDIRECT_URI,
                 STATE,
+                Instant.now(),
                 Instant.now().plusSeconds(300)
         ));
 

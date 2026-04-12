@@ -20,9 +20,9 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
 
     @Override
     public void saveAuthorizationCode(String code, String clientId, String username,
-                                      String redirectUri, String state, Instant expiresAt) {
+                                      String redirectUri, String state, Instant issuedAt, Instant expiresAt) {
         authorizationCodeRepository.save(
-                new OauthAuthorizationCode(code, clientId, username, redirectUri, state, expiresAt)
+                new OauthAuthorizationCode(code, clientId, username, redirectUri, state, issuedAt, expiresAt)
         );
     }
 

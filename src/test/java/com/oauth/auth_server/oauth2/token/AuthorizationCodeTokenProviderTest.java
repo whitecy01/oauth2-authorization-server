@@ -45,7 +45,7 @@ class AuthorizationCodeTokenProviderTest {
 
     private OauthAuthorizationCode validCode() {
         return new OauthAuthorizationCode(CODE, CLIENT_ID, "user1", REDIRECT_URI, null,
-                Instant.now().plusSeconds(600));
+                Instant.now(), Instant.now().plusSeconds(600));
     }
 
     private AuthorizationCodeTokenRequest validRequest() {
@@ -217,7 +217,8 @@ class AuthorizationCodeTokenProviderTest {
     @Test
     void 만료된_code면_삭제_후_invalid_grant() {
         OauthAuthorizationCode expired = new OauthAuthorizationCode(
-                CODE, CLIENT_ID, "user1", REDIRECT_URI, null, Instant.now().minusSeconds(1));
+                CODE, CLIENT_ID, "user1", REDIRECT_URI, null,
+                Instant.now().minusSeconds(700), Instant.now().minusSeconds(1));
         given(authorizationService.findByCode(CODE)).willReturn(Optional.of(expired));
 
         assertThatThrownBy(() -> provider.process(validRequest()))
@@ -230,7 +231,8 @@ class AuthorizationCodeTokenProviderTest {
     @Test
     void code의_clientId가_다르면_invalid_grant() {
         OauthAuthorizationCode wrongClient = new OauthAuthorizationCode(
-                CODE, "other-client", "user1", REDIRECT_URI, null, Instant.now().plusSeconds(600));
+                CODE, "other-client", "user1", REDIRECT_URI, null,
+                Instant.now(), Instant.now().plusSeconds(600));
         given(authorizationService.findByCode(CODE)).willReturn(Optional.of(wrongClient));
 
         assertThatThrownBy(() -> provider.process(validRequest()))
@@ -241,7 +243,8 @@ class AuthorizationCodeTokenProviderTest {
     @Test
     void code의_redirect_uri가_다르면_invalid_grant() {
         OauthAuthorizationCode wrongUri = new OauthAuthorizationCode(
-                CODE, CLIENT_ID, "user1", "http://other.com/callback", null, Instant.now().plusSeconds(600));
+                CODE, CLIENT_ID, "user1", "http://other.com/callback", null,
+                Instant.now(), Instant.now().plusSeconds(600));
         given(authorizationService.findByCode(CODE)).willReturn(Optional.of(wrongUri));
 
         assertThatThrownBy(() -> provider.process(validRequest()))
@@ -249,6 +252,19 @@ class AuthorizationCodeTokenProviderTest {
                 .satisfies(ex -> assertThat(errorCode(ex)).isEqualTo("invalid_grant"));
 
         then(authorizationService).should(never()).saveAccessToken(any(), any(), any(), any());
+    }
+
+    @Test
+    void 이미_사용된_code면_invalid_grant() {
+        // 첫 번째 사용: 성공 후 deleteByCode 호출됨
+        provider.process(validRequest());
+
+        // 두 번째 사용: findByCode가 empty 반환 (이미 삭제됨)
+        given(authorizationService.findByCode(CODE)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> provider.process(validRequest()))
+                .isInstanceOf(OAuth2AuthorizationException.class)
+                .satisfies(ex -> assertThat(errorCode(ex)).isEqualTo("invalid_grant"));
     }
 
     private String errorCode(Throwable ex) {

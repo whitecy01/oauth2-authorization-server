@@ -34,18 +34,22 @@ public class OauthAuthorizationCode {
     private String redirectUri;
 
     @Column(nullable = false)
+    private Instant issuedAt;
+
+    @Column(nullable = false)
     private Instant expiresAt;
 
     @Column(columnDefinition = "text")
     private String state;
 
     public OauthAuthorizationCode(String code, String clientId, String username,
-                                  String redirectUri, String state, Instant expiresAt) {
+                                  String redirectUri, String state, Instant issuedAt, Instant expiresAt) {
         this.code = code;
         this.clientId = clientId;
         this.username = username;
         this.redirectUri = redirectUri;
         this.state = state;
+        this.issuedAt = issuedAt;
         this.expiresAt = expiresAt;
     }
 }
