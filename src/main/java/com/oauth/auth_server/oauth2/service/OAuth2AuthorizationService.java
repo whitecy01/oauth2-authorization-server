@@ -8,7 +8,7 @@ import java.util.Optional;
 public interface OAuth2AuthorizationService {
 
     void saveAuthorizationCode(String code, String clientId, String username,
-                               String redirectUri, String state, Instant expiresAt);
+                               String redirectUri, String state, Instant issuedAt, Instant expiresAt);
 
     Optional<OauthAuthorizationCode> findByCode(String code);
 

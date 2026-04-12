@@ -10,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -54,17 +55,23 @@ class AuthorizationEndpointE2ETest {
 //    }
 
     /**
-     * 사용자 로그인부터해서 인가 코드 까지 진행
-     * @throws Exception
+     * 정상 흐름: 로그인 → 동의 화면 → 동의 승인 → 인가 코드 발급 (302 redirect)
+     *
+     * 1번 시나리오:
+     *   1. POST /login → 302 (세션 쿠키 획득)
+     *   2. GET  /oauth2/authorize → 200 동의 화면 (동의 이력 없음)
+     *   3. POST /oauth2/authorize action=approve → 302 redirect_uri?code=xxx&state=yyy
      */
     @Test
-    void loggedInUser_withConsent_getsAuthorizationCode() throws Exception{
-        System.out.println("[E2E] loggedInUser_withConsent_getsAuthorizationCode - start");
+    @DisplayName("1번 시나리오 정상 흐름: 동의 승인 후 인가 코드를 포함한 redirect를 받는다")
+    void normalFlow_approveConsent_redirectsWithCode() throws Exception {
         login();
 
         String redirectUri = "http://localhost:8080/callback";
         String state = "state-123";
         String scope = "read";
+
+        // Step 1: GET /oauth2/authorize → 동의 화면 (200)
         String authorizeUri = "http://localhost:" + port
                 + "/oauth2/authorize?response_type=code"
                 + "&client_id=test-client"
@@ -72,34 +79,240 @@ class AuthorizationEndpointE2ETest {
                 + "&scope=" + URLEncoder.encode(scope, StandardCharsets.UTF_8)
                 + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8);
 
-        HttpRequest authorizeRequest = HttpRequest.newBuilder()
-                .uri(URI.create(authorizeUri))
-                .GET()
-                .build();
-        HttpResponse<String> authorizeResponse = httpClient.send(authorizeRequest, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> authorizeResponse = httpClient.send(
+                HttpRequest.newBuilder().uri(URI.create(authorizeUri)).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
 
         assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
+        System.out.println("[E2E] authorizeResponse.HttpStatus=\n" + authorizeResponse.statusCode());
+        System.out.println("[E2E] authorizeResponse.body=\n" + authorizeResponse.body());
         assertThat(authorizeResponse.body()).contains("/oauth2/authorize");
 
+        // Step 2: POST /oauth2/authorize action=approve → 302 + code
         String consentBody = "client_id=test-client"
                 + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
                 + "&scope=" + URLEncoder.encode(scope, StandardCharsets.UTF_8)
                 + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8)
                 + "&action=approve";
 
-        HttpRequest consentRequest = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + port + "/oauth2/authorize"))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(consentBody))
-                .build();
-        HttpResponse<Void> consentResponse = httpClient.send(consentRequest, HttpResponse.BodyHandlers.discarding());
+        HttpResponse<Void> consentResponse = httpClient.send(
+                HttpRequest.newBuilder()
+                        .uri(URI.create("http://localhost:" + port + "/oauth2/authorize"))
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(consentBody))
+                        .build(),
+                HttpResponse.BodyHandlers.discarding());
 
-        System.out.println("[E2E] loggedInUser_withConsent_getsAuthorizationCode - consent status="
-                + consentResponse.statusCode());
-        System.out.println("[E2E] loggedInUser_withConsent_getsAuthorizationCode - consent location="
-                + consentResponse.headers().firstValue("Location").orElse("(none)"));
+        String location = consentResponse.headers().firstValue("Location").orElse("");
+        System.out.println("[E2E] normalFlow_approveConsent - status=" + consentResponse.statusCode());
+        System.out.println("[E2E] normalFlow_approveConsent - location=" + location);
+
+        assertThat(consentResponse.statusCode()).isEqualTo(HttpStatus.FOUND.value());
+        assertThat(location).startsWith(redirectUri);
+        assertThat(location).contains("code=");
+        assertThat(location).contains("state=" + state);
     }
 
+    @Test
+    @DisplayName("2번 시나리오 흐름 : 동의 없이 GET 하면 동의 화면이 뜬다.")
+    void noConsent_showsConsentPage() throws Exception{
+        System.out.println("[E2E] 로그인 진행 - start");
+        login();
+
+        String redirectUri = "http://localhost:8080/callback";
+        String requestUri = "http://localhost:" + port
+                + "/oauth2/authorize?response_type=code"
+                + "&client_id=test-client"
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&scope=read"
+                + "&state=state-123";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requestUri))
+                .GET()
+                .build();
+
+        HttpResponse<String> authorizeResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("[E2E] 2번 시라니오 - status=" + authorizeResponse.statusCode());
+        System.out.println("[E2E] 2번 시나리오 - body-length=" + authorizeResponse.body().length());
+
+        assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
+        assertThat(authorizeResponse.body()).contains("test-client");  // clientId 렌더링
+        assertThat(authorizeResponse.body()).contains("read");          // scope 렌더링
+        assertThat(authorizeResponse.body()).contains("state-123");     // state hidden field
+        assertThat(authorizeResponse.body()).contains("approve");       // 승인 버튼
+    }
+
+
+    @Test
+    @DisplayName("3번 시나리오 흐름 : client_id 없이 요청 결과는 400이 나와야함.")
+    void missingClientId_returns400() throws Exception{
+        System.out.println("[E2E] 로그인 진행 - start");
+        login();
+
+        String redirectUri = "http://localhost:8080/callback";
+        String requestUri = "http://localhost:" + port
+                + "/oauth2/authorize?response_type=code"
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&scope=read"
+                + "&state=state-123";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requestUri))
+                .GET()
+                .build();
+
+        HttpResponse<String> authorizeResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+
+    }
+
+    @Test
+    @DisplayName("4번 시나리오 흐름 : 미등록 client_id -> 요청 결과는 400이 나와야함.")
+    void unregisteredClientId_returns400() throws Exception{
+        System.out.println("[E2E] 로그인 진행 - start");
+        login();
+
+        String redirectUri = "http://localhost:8080/callback";
+        String requestUri = "http://localhost:" + port
+                + "/oauth2/authorize?response_type=code"
+                + "&client_id=no-client"
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&scope=read"
+                + "&state=state-123";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requestUri))
+                .GET()
+                .build();
+
+        HttpResponse<String> authorizeResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+
+    }
+
+
+    @Test
+    @DisplayName("5번 시나리오 흐름 : 미등록 redirect_uri -> 요청 결과는 400이 나와야함.")
+    void unregisteredRedirectUri_returns400() throws Exception{
+        System.out.println("[E2E] 로그인 진행 - start");
+        login();
+
+        String redirectUri = "http://localhost:8080/no";
+        String requestUri = "http://localhost:" + port
+                + "/oauth2/authorize?response_type=code"
+                + "&client_id=test-client"
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&scope=read"
+                + "&state=state-123";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requestUri))
+                .GET()
+                .build();
+
+        HttpResponse<String> authorizeResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+    }
+
+    /**
+     * 미등록 scope 시나리오
+     * 1.validateResponseType()  → OK
+     * 2. findClient() → OK (client_id 유효)
+     * 3. resolveRedirectUri()    → OK → resolvedRedirectUri 확정
+     * 4. validateScopes() → invalid_scope 예외 발생  단, 예외에 resolvedRedirectUri를 담아서 던짐
+     * scope 검증 시점에서는 이미 redirect_uri가 검증되었기 때문에 에러를 redirect로 돌려보내는 것이 RFC 6749 스펙
+     * @throws Exception
+     */
+    @Test
+    @DisplayName("6번 시나리오 흐름 : 미등록 scope -> 요청 결과는 302이 나와야함.")
+    void unregisteredScope_returns302() throws Exception{
+        System.out.println("[E2E] 로그인 진행 - start");
+        login();
+
+        String redirectUri = "http://localhost:8080/callback";
+        String requestUri = "http://localhost:" + port
+                + "/oauth2/authorize?response_type=code"
+                + "&client_id=test-client"
+                + "&redirect_uri=" +
+                URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&scope=unknown-scope"
+                + "&state=state-123";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requestUri))
+                .GET()
+                .build();
+
+        HttpResponse<String> authorizeResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.FOUND.value());
+        System.out.println("[E2E] status=" + authorizeResponse.statusCode());
+        System.out.println("[E2E] location=" + authorizeResponse.headers().firstValue("Location").orElse("(none)"));
+        System.out.println("[E2E] body=" + authorizeResponse.body());
+        String location = authorizeResponse.headers().firstValue("Location").orElse("");
+        assertThat(location).contains("invalid_scope");
+    }
+
+    @Test
+    @DisplayName("7번 시나리오 흐름 : response_type=token-> 요청 결과는 unsupported, 302이 나와야함.")
+    void unsupportedResponseType_redirectsWithError() throws Exception{
+        System.out.println("[E2E] 로그인 진행 - start");
+        login();
+
+        String redirectUri = "http://localhost:8080/callback";
+        String requestUri = "http://localhost:" + port
+                + "/oauth2/authorize?response_type=token"
+                + "&client_id=test-client"
+                + "&redirect_uri=" +
+                URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&scope=unknown-scope"
+                + "&state=state-123";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requestUri))
+                .GET()
+                .build();
+
+        HttpResponse<String> authorizeResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.FOUND.value());
+        System.out.println("[E2E] status=" + authorizeResponse.statusCode());
+        System.out.println("[E2E] location=" + authorizeResponse.headers().firstValue("Location").orElse("(none)"));
+        System.out.println("[E2E] body=" + authorizeResponse.body());
+        String location = authorizeResponse.headers().firstValue("Location").orElse("");
+        assertThat(location).contains("unsupported");
+    }
+
+    /**
+     * 요청: GET /oauth2/authorize?...&scope=unknown&state=abc123
+     * 에러 발생 (invalid_scope) -> 응답: 302 Location: http://localhost:8080/callback?error=invalid_scope&state=abc123
+     *   ↑ state가 그대로 전달
+     * @throws Exception
+     */
+    @Test
+    @DisplayName("8번 시나리오 흐름 : state 포함 시 error redirect 에도 state 전달 ")
+    void errorRedirect_includesState() throws Exception{
+        login();
+
+        String redirectUri = "http://localhost:8080/callback";
+        String requestUri = "http://localhost:" + port
+                + "/oauth2/authorize?response_type=code"
+                + "&client_id=test-client"
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&scope=unknown-scope"
+                + "&state=state-123";
+
+        HttpResponse<String> authorizeResponse = httpClient.send(
+                HttpRequest.newBuilder().uri(URI.create(requestUri)).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        String location = authorizeResponse.headers().firstValue("Location").orElse("");
+        System.out.println("[E2E] status=" + authorizeResponse.statusCode());
+        System.out.println("[E2E] location=" + location);
+
+        assertThat(authorizeResponse.statusCode()).isEqualTo(HttpStatus.FOUND.value());
+        assertThat(location).contains("error=");
+        assertThat(location).contains("state=state-123");
+    }
 
 
     /**

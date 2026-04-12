@@ -66,9 +66,10 @@ public class OAuth2AuthorizationCodeRequestAuthenticationProvider {
                 .orElseThrow(() -> new IllegalArgumentException("client not found: " + clientId));
 
         String code = UUID.randomUUID().toString().replace("-", "");
-        Instant expiresAt = Instant.now().plusSeconds(AUTHORIZATION_CODE_TTL_SECONDS);
+        Instant issuedAt = Instant.now();
+        Instant expiresAt = issuedAt.plusSeconds(AUTHORIZATION_CODE_TTL_SECONDS);
 
-        authorizationService.saveAuthorizationCode(code, client.getClientId(), username, redirectUri, state, expiresAt);
+        authorizationService.saveAuthorizationCode(code, client.getClientId(), username, redirectUri, state, issuedAt, expiresAt);
 
         return new AuthorizationCodeIssuedToken(code, redirectUri, state);
     }

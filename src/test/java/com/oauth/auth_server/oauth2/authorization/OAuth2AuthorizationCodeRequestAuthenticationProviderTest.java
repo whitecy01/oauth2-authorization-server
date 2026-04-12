@@ -63,7 +63,7 @@ class OAuth2AuthorizationCodeRequestAuthenticationProviderTest {
         assertThat(result.getCode()).isNotBlank();
         assertThat(result.getRedirectUri()).isEqualTo(REDIRECT_URI);
         assertThat(result.getState()).isEqualTo("state-123");
-        then(authorizationService).should().saveAuthorizationCode(any(), any(), any(), any(), any(), any());
+        then(authorizationService).should().saveAuthorizationCode(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

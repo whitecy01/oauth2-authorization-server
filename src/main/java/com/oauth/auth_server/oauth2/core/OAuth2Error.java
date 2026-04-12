@@ -20,7 +20,7 @@ public class OAuth2Error implements Serializable {
         }
         this.errorCode = errorCode;
         this.description = description;
-        this.uri = uri;
+        this.uri = uri != null ? uri : OAuth2ErrorCodes.getUri(errorCode);
     }
 
     public final String getErrorCode() {
