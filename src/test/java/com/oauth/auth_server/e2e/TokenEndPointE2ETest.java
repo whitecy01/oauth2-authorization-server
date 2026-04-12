@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -155,5 +156,162 @@ public class TokenEndPointE2ETest {
         assertThat(resourceResponse.body()).contains("\"username\":\"user\"");
         assertThat(resourceResponse.body()).contains("\"email\":\"user@example.com\"");
         log.info("[E2E] User_giveAccessTokenNextUserInfo - done");
+    }
+
+    // ── invalid_request ───────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("3번: grant_type 누락 → invalid_request 400")
+    void missingGrantType_returns400_invalidRequest() throws IOException, InterruptedException {
+        String body = "code=" + AUTHORIZATION_CODE
+                + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8);
+
+        HttpResponse<String> response = httpClient.send(tokenRequest(basicAuth(CLIENT_ID, "secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(response.body()).contains("invalid_request");
+    }
+
+    // ── unsupported_grant_type ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("4번: grant_type=client_credentials → unsupported_grant_type 400")
+    void unsupportedGrantType_returns400() throws IOException, InterruptedException {
+        String body = "grant_type=client_credentials"
+                + "&code=" + AUTHORIZATION_CODE
+                + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8);
+
+        HttpResponse<String> response = httpClient.send(tokenRequest(basicAuth(CLIENT_ID, "secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(response.body()).contains("unsupported_grant_type");
+    }
+
+    // ── invalid_client ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("5번: Authorization 헤더 없음 → invalid_client 401")
+    void missingCredentials_returns401_invalidClient() throws IOException, InterruptedException {
+        String body = "grant_type=authorization_code"
+                + "&code=" + AUTHORIZATION_CODE
+                + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/oauth2/token"))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(response.body()).contains("invalid_client");
+    }
+
+    @Test
+    @DisplayName("6번: 잘못된 client_secret → invalid_client 401")
+    void wrongClientSecret_returns401_invalidClient() throws IOException, InterruptedException {
+        String body = "grant_type=authorization_code"
+                + "&code=" + AUTHORIZATION_CODE
+                + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8);
+
+        HttpResponse<String> response = httpClient.send(
+                tokenRequest(basicAuth(CLIENT_ID, "wrong-secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(response.body()).contains("invalid_client");
+    }
+
+    // ── invalid_grant ─────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("7번: 존재하지 않는 code → invalid_grant 400")
+    void unknownCode_returns400_invalidGrant() throws IOException, InterruptedException {
+        String body = "grant_type=authorization_code"
+                + "&code=nonexistent-code"
+                + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8);
+
+        HttpResponse<String> response = httpClient.send(
+                tokenRequest(basicAuth(CLIENT_ID, "secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(response.body()).contains("invalid_grant");
+    }
+
+    @Test
+    @DisplayName("8번: 만료된 code → invalid_grant 400")
+    void expiredCode_returns400_invalidGrant() throws IOException, InterruptedException {
+        String expiredCode = "expired-code";
+        authorizationCodeRepository.save(new OauthAuthorizationCode(
+                expiredCode, CLIENT_ID, USERNAME, REDIRECT_URI, STATE,
+                Instant.now().minusSeconds(700),
+                Instant.now().minusSeconds(1)
+        ));
+
+        String body = "grant_type=authorization_code"
+                + "&code=" + expiredCode
+                + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8);
+
+        HttpResponse<String> response = httpClient.send(
+                tokenRequest(basicAuth(CLIENT_ID, "secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(response.body()).contains("invalid_grant");
+    }
+
+    @Test
+    @DisplayName("9번: 이미 사용한 code 재사용 → invalid_grant 400")
+    void reusedCode_returns400_invalidGrant() throws IOException, InterruptedException {
+        String body = "grant_type=authorization_code"
+                + "&code=" + AUTHORIZATION_CODE
+                + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8);
+
+        // 첫 번째 요청 - 성공
+        httpClient.send(tokenRequest(basicAuth(CLIENT_ID, "secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        // 두 번째 요청 - 재사용
+        HttpResponse<String> response = httpClient.send(
+                tokenRequest(basicAuth(CLIENT_ID, "secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(response.body()).contains("invalid_grant");
+    }
+
+    @Test
+    @DisplayName("10번: 미등록 redirect_uri → invalid_grant 400")
+    void unregisteredRedirectUri_returns400_invalidGrant() throws IOException, InterruptedException {
+        String body = "grant_type=authorization_code"
+                + "&code=" + AUTHORIZATION_CODE
+                + "&redirect_uri=" + URLEncoder.encode("http://evil.com/callback", StandardCharsets.UTF_8);
+
+        HttpResponse<String> response = httpClient.send(
+                tokenRequest(basicAuth(CLIENT_ID, "secret"), body),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(response.body()).contains("invalid_grant");
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private String basicAuth(String clientId, String secret) {
+        return Base64.getEncoder()
+                .encodeToString((clientId + ":" + secret).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private HttpRequest tokenRequest(String basicAuth, String body) {
+        return HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + "/oauth2/token"))
+                .header("Authorization", "Basic " + basicAuth)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
     }
 }
