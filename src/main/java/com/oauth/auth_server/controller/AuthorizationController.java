@@ -6,7 +6,6 @@ import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequest
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationProvider;
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationToken;
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationEndpointFilter;
-import com.oauth.auth_server.service.AuthorizationConsentService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Arrays;
@@ -18,8 +17,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -28,9 +27,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuthorizationController {
 
     private final OAuth2AuthorizationCodeRequestAuthenticationProvider provider;
-    private final AuthorizationConsentService consentService;
 
-    @GetMapping("/oauth2/authorize")
+    @RequestMapping(value = "/oauth2/authorize", method = {RequestMethod.GET, RequestMethod.POST})
     public Object authorize(
             @RequestParam(value = "response_type", required = false) String responseType,
             @RequestParam(value = "client_id", required = false) String clientId,
@@ -82,7 +80,7 @@ public class AuthorizationController {
      * OAuth2AuthorizationEndpointFilter가 동의 필요 시 forward 하는 내부 엔드포인트.
      * request attribute에서 ConsentRequiredException을 꺼내 동의 화면을 렌더링한다.
      */
-    @GetMapping("/oauth2/consent-view")
+    @RequestMapping(value = "/oauth2/consent-view", method = RequestMethod.GET)
     public String showConsentView(HttpServletRequest request, Model model) {
         ConsentRequiredException e =
                 (ConsentRequiredException) request.getAttribute(OAuth2AuthorizationEndpointFilter.CONSENT_EXCEPTION_ATTR);
@@ -97,27 +95,6 @@ public class AuthorizationController {
         model.addAttribute("scope", String.join(" ", authRequest.getScopes()));
         model.addAttribute("state", authRequest.getState() == null ? "" : authRequest.getState());
         return "oauth2/consent";
-    }
-
-    @PostMapping("/oauth2/authorize")
-    public ResponseEntity<Void> submitConsent(
-            @RequestParam("client_id") String clientId,
-            @RequestParam("redirect_uri") String redirectUri,
-            @RequestParam(value = "scope", required = false) String scope,
-            @RequestParam(value = "state", required = false) String state,
-            @RequestParam("action") String action,
-            @AuthenticationPrincipal UserDetails user
-    ) {
-        if ("deny".equals(action)) {
-            return buildErrorRedirect(redirectUri, "access_denied", state);
-        }
-
-        String username = user.getUsername();
-        List<String> scopes = splitScopes(scope);
-
-        consentService.saveConsent(username, clientId, scopes);
-        AuthorizationCodeIssuedToken issued = provider.issueCode(clientId, username, redirectUri, state, scopes);
-        return buildCodeRedirect(issued);
     }
 
     private ResponseEntity<Void> buildCodeRedirect(AuthorizationCodeIssuedToken issued) {

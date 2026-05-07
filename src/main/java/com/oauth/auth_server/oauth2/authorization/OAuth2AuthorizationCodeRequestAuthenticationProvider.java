@@ -53,7 +53,16 @@ public class OAuth2AuthorizationCodeRequestAuthenticationProvider {
     }
 
     /**
-     * 동의 완료 후 코드를 발급한다. (POST /oauth2/authorize approve 처리용)
+     * 동의 제출을 처리한다. 동의를 저장하고 인가 코드를 발급한다.
+     */
+    public AuthorizationCodeIssuedToken processConsent(OAuth2AuthorizationConsentAuthenticationToken consentToken) {
+        consentService.saveConsent(consentToken.getUsername(), consentToken.getClientId(), consentToken.getScopes());
+        return issueCode(consentToken.getClientId(), consentToken.getUsername(),
+                consentToken.getRedirectUri(), consentToken.getState(), consentToken.getScopes());
+    }
+
+    /**
+     * 동의 완료 후 코드를 발급한다.
      */
     public AuthorizationCodeIssuedToken issueCode(
             String clientId,

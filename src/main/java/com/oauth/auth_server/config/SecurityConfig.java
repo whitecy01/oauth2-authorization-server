@@ -2,6 +2,7 @@ package com.oauth.auth_server.config;
 
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationConverter;
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationCodeRequestAuthenticationProvider;
+import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationConsentAuthenticationConverter;
 import com.oauth.auth_server.oauth2.authorization.OAuth2AuthorizationEndpointFilter;
 import com.oauth.auth_server.oauth2.token.AuthorizationCodeTokenProvider;
 import com.oauth.auth_server.oauth2.token.OAuth2TokenEndpointAuthenticationConverter;
@@ -49,9 +50,10 @@ public class SecurityConfig {
     @Bean
     @ConditionalOnBean(OAuth2AuthorizationCodeRequestAuthenticationConverter.class)
     OAuth2AuthorizationEndpointFilter authorizationEndpointFilter(
-            OAuth2AuthorizationCodeRequestAuthenticationConverter converter,
+            OAuth2AuthorizationCodeRequestAuthenticationConverter authorizationConverter,
+            OAuth2AuthorizationConsentAuthenticationConverter consentConverter,
             OAuth2AuthorizationCodeRequestAuthenticationProvider provider) {
-        return new OAuth2AuthorizationEndpointFilter(converter, provider);
+        return new OAuth2AuthorizationEndpointFilter(authorizationConverter, consentConverter, provider);
     }
 
     @Bean
