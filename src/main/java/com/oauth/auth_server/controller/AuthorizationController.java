@@ -17,8 +17,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -34,7 +34,7 @@ public class AuthorizationController {
      * 예:
      * /oauth2/authorize?client_id=test-client&redirect_uri=http://localhost:3000/callback
      */
-    @GetMapping("/oauth2/authorize")
+    @RequestMapping(value = "/oauth2/authorize", method = {RequestMethod.GET, RequestMethod.POST}, params = "response_type")
     public Object authorize(
             @RequestParam("response_type") String responseType,
             @RequestParam("client_id") String clientId,
@@ -64,7 +64,7 @@ public class AuthorizationController {
         return "oauth2/consent";
     }
 
-    @PostMapping("/oauth2/authorize")
+    @RequestMapping(value = "/oauth2/authorize", method = RequestMethod.POST, params = "action")
     public ResponseEntity<Void> submitConsent(
             @RequestParam("client_id") String clientId,
             @RequestParam("redirect_uri") String redirectUri,
